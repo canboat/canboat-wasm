@@ -18,7 +18,7 @@
     "pkg/"
   ],
   "scripts": {
-    "build:wasm": "wasm-pack build --release --target nodejs",
+    "build:wasm": "wasm-pack build --release --target nodejs && rm -f pkg/.gitignore",
     "build:ts": "tsup",
     "build": "npm run build:wasm && npm run build:ts",
     "typecheck": "tsc",

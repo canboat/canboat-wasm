@@ -62,3 +62,13 @@ jobs:
 
       - name: Smoke tests (ESM + CJS entries)
         run: npm test
+
+      # wasm-pack writes pkg/.gitignore ('*'), and npm honors nested
+      # ignore files even inside files:-listed directories — without the
+      # rm in build:wasm the published tarball ships no .wasm at all.
+      - name: Tarball must contain the wasm and both builds
+        run: |
+          npm pack --dry-run 2>&1 | tee pack.txt
+          grep -q "pkg/canboat_wasm_bg.wasm" pack.txt
+          grep -q "dist/index.cjs" pack.txt
+          grep -q "dist/index.js" pack.txt
