@@ -3,6 +3,7 @@
 //   - the canboatjs-compatibility shim (FromPgn, toPgn,
 //     pgnToActisenseSerialFormat) for drop-in use by existing consumers.
 export {
+  ByteDecoder,
   Decoder,
   TxEncoder,
   encodeToPlain,

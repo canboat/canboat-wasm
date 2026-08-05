@@ -259,6 +259,168 @@ impl TxEncoder {
     }
 }
 
+/// Streaming byte decoder for the binary gateway framings: Actisense
+/// BEM (`kind: "ngt1"` — NGT-1 serial and W2K-1 Actisense mode share
+/// it) and the Maretron IPG100/200 session protocol
+/// (`kind: "maretron-ipg"`, including the text-mode handshake). The JS
+/// host owns the socket; this owns every byte in between.
+///
+/// Wasm has no clock, so frames keep the device timestamp (ngt1) or an
+/// epoch placeholder (maretron) — the consuming stream element stamps
+/// receive time.
+#[wasm_bindgen]
+pub struct ByteDecoder {
+    kind: ByteKind,
+    db: &'static PgnDatabase,
+    opts: JsonOptions,
+    pending_tx: Vec<u8>,
+    errors: Vec<String>,
+}
+
+enum ByteKind {
+    Ngt(canboat_core::format::ngt1::Ngt1Decoder),
+    Maretron(canboat_io::device::maretron::Decoder),
+}
+
+#[wasm_bindgen]
+impl ByteDecoder {
+    /// `kind`: `"ngt1"` | `"maretron-ipg"`. Flags as on [`Decoder`].
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        kind: &str,
+        camel: bool,
+        name_value: bool,
+        si: bool,
+    ) -> Result<ByteDecoder, JsError> {
+        let kind = match kind {
+            "ngt1" => ByteKind::Ngt(canboat_core::format::ngt1::Ngt1Decoder::new()),
+            // Fixed epoch timestamp: the io decoder stamps frames with
+            // the host clock otherwise, which panics on wasm.
+            "maretron-ipg" => ByteKind::Maretron(canboat_io::device::maretron::Decoder::new(Some(
+                "1970-01-01T00:00:00.000Z".to_string(),
+            ))),
+            other => {
+                return Err(JsError::new(&format!(
+                    "unknown byte kind '{other}' (ngt1 | maretron-ipg)"
+                )));
+            }
+        };
+        Ok(ByteDecoder {
+            kind,
+            db: database(si),
+            opts: JsonOptions {
+                name_value,
+                camel_case: if camel {
+                    CamelCase::Lower
+                } else {
+                    CamelCase::Off
+                },
+                ..JsonOptions::default()
+            },
+            pending_tx: Vec::new(),
+            errors: Vec::new(),
+        })
+    }
+
+    /// Bytes to write as soon as the connection opens: the NGT-1
+    /// startup ping, or the Maretron CONNECT (with `password`).
+    #[wasm_bindgen(js_name = initBytes)]
+    pub fn init_bytes(&self, password: &str) -> Vec<u8> {
+        match &self.kind {
+            ByteKind::Ngt(_) => canboat_core::format::ngt1::encode_startup_ping(),
+            ByteKind::Maretron(_) => canboat_core::format::maretron_ipg::build_connect(password),
+        }
+    }
+
+    /// Periodic keepalive payload and its interval in seconds, or
+    /// `undefined` when the device needs none.
+    #[wasm_bindgen(js_name = keepaliveBytes)]
+    pub fn keepalive_bytes(&self) -> Option<Vec<u8>> {
+        match &self.kind {
+            ByteKind::Ngt(_) => Some(canboat_core::format::ngt1::encode_startup_ping()),
+            ByteKind::Maretron(_) => None,
+        }
+    }
+
+    /// Feed received bytes; returns the analyzer-shaped JSON records
+    /// completed by them. Session responses the device expects (the
+    /// Maretron SET_MODE BINARY) accumulate for [`takePendingTx`];
+    /// framing errors for [`takeErrors`].
+    #[wasm_bindgen(js_name = decodeBytes)]
+    pub fn decode_bytes(&mut self, bytes: &[u8]) -> Vec<String> {
+        let mut frames: Vec<RawFrame> = Vec::new();
+        match &mut self.kind {
+            ByteKind::Ngt(dec) => {
+                for ev in dec.push_bytes(bytes) {
+                    use canboat_core::format::ngt1::NgtEvent;
+                    match ev {
+                        NgtEvent::Message(msg) => {
+                            if let Some(f) = msg.to_raw_frame() {
+                                frames.push(f);
+                            }
+                        }
+                        NgtEvent::Error(e) => self.errors.push(e.to_string()),
+                        _ => {}
+                    }
+                }
+            }
+            ByteKind::Maretron(dec) => {
+                use canboat_io::device::{DeviceDecoder as _, DeviceEvent};
+                let mut events = Vec::new();
+                dec.decode(bytes, &mut events);
+                for ev in events {
+                    match ev {
+                        DeviceEvent::Frame(f) => frames.push(f),
+                        DeviceEvent::SendBytes(b) => self.pending_tx.extend_from_slice(&b),
+                        DeviceEvent::Error(e) => self.errors.push(e),
+                    }
+                }
+            }
+        }
+        let mut out = Vec::with_capacity(frames.len());
+        for frame in frames {
+            match self.db.decode(&frame) {
+                Ok(decoded) => {
+                    let mut s = String::with_capacity(256);
+                    if write_json(&mut s, &decoded, &self.opts).is_ok() {
+                        out.push(s);
+                    }
+                }
+                Err(e) => self.errors.push(format!("decode pgn {}: {e}", frame.pgn)),
+            }
+        }
+        out
+    }
+
+    /// Drain the bytes the session needs written to the device.
+    #[wasm_bindgen(js_name = takePendingTx)]
+    pub fn take_pending_tx(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.pending_tx)
+    }
+
+    /// Drain accumulated framing/decode error messages.
+    #[wasm_bindgen(js_name = takeErrors)]
+    pub fn take_errors(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.errors)
+    }
+
+    /// Encode one JSON record to the device's transmit bytes.
+    #[wasm_bindgen(js_name = encodeFrame)]
+    pub fn encode_frame(&self, json: &str, si: bool) -> Result<Vec<u8>, JsError> {
+        let frame = frame_from_json_str(json, si)?;
+        match &self.kind {
+            ByteKind::Ngt(_) => Ok(canboat_core::format::ngt1::encode_n2k_send_frame(&frame)),
+            ByteKind::Maretron(_) => canboat_core::format::maretron_ipg::build_frame(
+                frame.pgn,
+                frame.prio,
+                frame.dst,
+                &frame.data,
+            )
+            .ok_or_else(|| JsError::new("maretron: payload too large")),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

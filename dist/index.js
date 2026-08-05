@@ -1,5 +1,6 @@
 // ts/index.ts
 import {
+  ByteDecoder,
   Decoder as Decoder2,
   TxEncoder,
   encodeToPlain as encodeToPlain2,
@@ -110,6 +111,7 @@ function pgnToActisenseSerialFormat(pgnObject) {
   return encodeToPlain(JSON.stringify(pgnObject), true);
 }
 export {
+  ByteDecoder,
   Decoder2 as Decoder,
   FromPgn,
   TxEncoder,

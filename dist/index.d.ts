@@ -1,4 +1,4 @@
-export { Decoder, TxEncoder, encodeData, encodeToPlain, version } from '../pkg/canboat_wasm.js';
+export { ByteDecoder, Decoder, TxEncoder, encodeData, encodeToPlain, version } from '../pkg/canboat_wasm.js';
 import { EventEmitter } from 'node:events';
 
 /** A decoded PGN in canboatjs field conventions. */

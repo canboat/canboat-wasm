@@ -20,6 +20,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // ts/index.ts
 var index_exports = {};
 __export(index_exports, {
+  ByteDecoder: () => import_canboat_wasm2.ByteDecoder,
   Decoder: () => import_canboat_wasm2.Decoder,
   FromPgn: () => FromPgn,
   TxEncoder: () => import_canboat_wasm2.TxEncoder,
@@ -137,6 +138,7 @@ function pgnToActisenseSerialFormat(pgnObject) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  ByteDecoder,
   Decoder,
   FromPgn,
   TxEncoder,

@@ -118,3 +118,41 @@ assert.match(version(), /^\d+\.\d+\.\d+/);
 }
 
 console.log("smoke (esm): all assertions passed");
+
+// ByteDecoder: kind validation, init/keepalive/TX byte builders.
+{
+  const { ByteDecoder } = await import("../dist/index.js");
+  const m = new ByteDecoder("maretron-ipg", true, true, true);
+  assert.ok(m.initBytes("secret").length > 0, "maretron CONNECT bytes");
+  assert.strictEqual(m.keepaliveBytes(), undefined);
+  const n = new ByteDecoder("ngt1", true, true, true);
+  assert.ok(n.initBytes("").length > 0, "ngt1 startup ping");
+  assert.ok(n.keepaliveBytes().length > 0, "ngt1 keepalive");
+  const claim = JSON.stringify({
+    pgn: 60928,
+    prio: 6,
+    dst: 255,
+    src: 0,
+    fields: {
+      uniqueNumber: 1072,
+      manufacturerCode: "Yacht Devices",
+      deviceInstanceLower: 0,
+      deviceInstanceUpper: 0,
+      deviceFunction: 130,
+      deviceClass: "Sensor Communication Interface",
+      systemInstance: 0,
+      industryGroup: "Marine Industry",
+      spare: 1,
+      arbitraryAddressCapable: "Yes",
+    },
+  });
+  assert.ok(
+    Buffer.from(n.encodeFrame(claim, true)).length > 10,
+    "ngt1 BEM tx frame",
+  );
+  assert.ok(
+    Buffer.from(m.encodeFrame(claim, true)).length > 10,
+    "maretron tx frame",
+  );
+  assert.throws(() => new ByteDecoder("nope", true, true, true));
+}
