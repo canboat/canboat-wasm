@@ -1,7 +1,7 @@
 // Vendored from signalk-server packages/streams/src/analyzerOutput.ts
 // (Apache-2.0, Signal K project) — the analyzer→canboatjs-shape normalizer,
 // live-verified in production. Will move upstream with the signalk PRs.
-import { getPGNWithId } from '@canboat/ts-pgns'
+import { getPGNWithId } from "@canboat/ts-pgns";
 
 /*
  * canboat's analyzer, invoked with -camel (as n2kAnalyzer does), wraps every
@@ -39,73 +39,73 @@ import { getPGNWithId } from '@canboat/ts-pgns'
  */
 
 interface NameValue {
-  value: unknown
-  name?: string | null
+  value: unknown;
+  name?: string | null;
 }
 
 const isNameValue = (v: unknown): v is NameValue =>
-  typeof v === 'object' && v !== null && !Array.isArray(v) && 'value' in v
+  typeof v === "object" && v !== null && !Array.isArray(v) && "value" in v;
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v)
+  typeof v === "object" && v !== null && !Array.isArray(v);
 
 function fieldTypesForId(id: string): Record<string, string> {
-  const types: Record<string, string> = {}
-  const definition = getPGNWithId(id)
+  const types: Record<string, string> = {};
+  const definition = getPGNWithId(id);
   if (definition) {
     for (const field of definition.Fields) {
-      types[field.Id] = field.FieldType as string
+      types[field.Id] = field.FieldType as string;
     }
   }
-  return types
+  return types;
 }
 
 const isSpareOrReserved = (fieldType: string | undefined) =>
-  fieldType === 'SPARE' || fieldType === 'RESERVED'
+  fieldType === "SPARE" || fieldType === "RESERVED";
 
 function normalizeValue(
   value: unknown,
   fieldType: string | undefined,
-  types: Record<string, string>
+  types: Record<string, string>,
 ): unknown {
   if (Array.isArray(value)) {
-    if (fieldType === 'BITLOOKUP') {
+    if (fieldType === "BITLOOKUP") {
       // canboatjs renders a bit lookup as the names of the set bits and
       // yields [] when no named bit is set (incl. the all-ones
       // "unavailable" pattern); entries whose bit has no enumeration name
       // are therefore dropped rather than kept as raw numbers.
       return value
         .map((entry) => (isNameValue(entry) ? entry.name : entry))
-        .filter((name) => typeof name === 'string')
+        .filter((name) => typeof name === "string");
     }
     return value.map((entry) =>
       isNameValue(entry)
         ? (entry.name ?? entry.value)
         : isPlainObject(entry)
           ? normalizeFields(entry, types)
-          : entry
-    )
+          : entry,
+    );
   }
   if (isNameValue(value)) {
-    return fieldType === 'INDIRECT_LOOKUP'
+    return fieldType === "INDIRECT_LOOKUP"
       ? value.value
-      : (value.name ?? value.value)
+      : (value.name ?? value.value);
   }
   if (isPlainObject(value)) {
-    return normalizeFields(value, types)
+    return normalizeFields(value, types);
   }
-  return value
+  return value;
 }
 
 function normalizeFields(
   fields: Record<string, unknown>,
-  types: Record<string, string>
+  types: Record<string, string>,
 ): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
+  const result: Record<string, unknown> = {};
   for (const [id, value] of Object.entries(fields)) {
-    result[id] = normalizeValue(value, types[id], types)
+    result[id] = normalizeValue(value, types[id], types);
   }
-  return result
+  return result;
 }
 
 /**
@@ -115,19 +115,19 @@ function normalizeFields(
  * flat output from a pre-v6 analyzer, or unrecognised shapes) unchanged.
  */
 export function unwrapAnalyzerOutput(
-  parsed: Record<string, unknown>
+  parsed: Record<string, unknown>,
 ): Record<string, unknown> {
-  const keys = Object.keys(parsed)
-  const id = keys.length === 1 ? keys[0] : undefined
+  const keys = Object.keys(parsed);
+  const id = keys.length === 1 ? keys[0] : undefined;
   if (id === undefined) {
-    return parsed
+    return parsed;
   }
-  const inner = parsed[id]
-  if (!isPlainObject(inner) || typeof inner.pgn !== 'number') {
-    return parsed
+  const inner = parsed[id];
+  if (!isPlainObject(inner) || typeof inner.pgn !== "number") {
+    return parsed;
   }
-  const types = fieldTypesForId(id)
-  const result: Record<string, unknown> = { ...inner }
+  const types = fieldTypesForId(id);
+  const result: Record<string, unknown> = { ...inner };
   // A message whose fields are all empty (e.g. a Configuration Information
   // with blank strings) arrives with no fields object at all — the analyzer
   // skips empty values wholesale. canboatjs always emits a fields object,
@@ -136,18 +136,18 @@ export function unwrapAnalyzerOutput(
   // n2kSourceMetadata listener. Normalise to {}.
   const fields = isPlainObject(inner.fields)
     ? normalizeFields(inner.fields, types)
-    : {}
+    : {};
   for (const [fieldId, fieldType] of Object.entries(types)) {
     if (isSpareOrReserved(fieldType) && !(fieldId in fields)) {
-      fields[fieldId] = 0
+      fields[fieldId] = 0;
     }
     // The analyzer also omits bit lookups with no set bits; canboatjs
     // emits [], from which n2k-signalk derives "normal" notification
     // states — restore the empty array so those states are not lost.
-    if (fieldType === 'BITLOOKUP' && !(fieldId in fields)) {
-      fields[fieldId] = []
+    if (fieldType === "BITLOOKUP" && !(fieldId in fields)) {
+      fields[fieldId] = [];
     }
   }
-  result.fields = fields
-  return result
+  result.fields = fields;
+  return result;
 }

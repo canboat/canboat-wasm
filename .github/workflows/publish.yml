@@ -1,0 +1,79 @@
+name: Publish
+
+# Publishing is tag-triggered CI, never a laptop. The glob is tight and
+# dotted on purpose: a bare v* fires on `vnext`, and even v[0-9]* is
+# unanchored after the digit (a `v1-anything` tag would match).
+on:
+  push:
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # OIDC trusted publishing: the registry trusts this workflow's
+    # identity — no NPM_TOKEN secret, no OTP. id-token: write is what
+    # makes OIDC possible at all. Wrinkle: a brand-new package needs
+    # one manual `npm publish` (CLI + OTP) before a trusted publisher
+    # can be configured for it on npmjs.com.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Validate tag is strict semver and matches package.json
+        id: version
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          if ! printf '%s' "$TAG" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Tag '$GITHUB_REF_NAME' is not strict semver." ; exit 1
+          fi
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag version $TAG != package.json version $PKG." ; exit 1
+          fi
+          # Prereleases never move `latest`: key on "has a prerelease
+          # part", not an enumerated suffix list.
+          case "$TAG" in
+            *-*) echo "dist_tag=next" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "dist_tag=latest" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust with wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: npm install -g wasm-pack
+
+      - name: Install JS dependencies
+        run: npm install
+
+      - name: Build, typecheck and test
+        run: |
+          npm run build
+          npm run typecheck
+          npm test
+
+      - name: Publish to npm
+        run: npm publish --access public --tag "${{ steps.version.outputs.dist_tag }}"
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+
+  # Separate job gated on publish, so a failed npm push can never leave
+  # a Release pointing at a version that never reached the registry.
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create GitHub Release with generated notes
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

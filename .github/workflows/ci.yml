@@ -51,6 +51,9 @@ jobs:
       - name: Install JS dependencies
         run: npm install
 
+      - name: Lint and format check (read-only)
+        run: npm run ci-lint
+
       - name: Typecheck (strict)
         run: npm run typecheck
 

@@ -1,7 +1,7 @@
 {
   "name": "@canboat/wasm",
   "version": "0.1.0",
-  "description": "WebAssembly build of the canboat NMEA 2000 decoder/encoder — the canboat wire brain as a pure-npm, in-process package.",
+  "description": "WebAssembly build of the canboat NMEA 2000 decoder/encoder \u2014 the canboat wire brain as a pure-npm, in-process package.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -23,7 +23,9 @@
     "build": "npm run build:wasm && npm run build:ts",
     "typecheck": "tsc",
     "test": "node test/smoke.mjs && node test/smoke.cjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "format": "prettier --write . && eslint --fix",
+    "ci-lint": "eslint && prettier --check ."
   },
   "repository": "https://github.com/canboat/canboat-wasm",
   "license": "Apache-2.0",
@@ -31,9 +33,13 @@
     "@canboat/ts-pgns": "1.11.x"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@types/node": "^24.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.6.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0"
   },
   "engines": {
     "node": ">=18"

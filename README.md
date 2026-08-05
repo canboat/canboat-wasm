@@ -29,19 +29,21 @@ Strict TypeScript, ESM-first with a CJS build — `import` and `require`
 both work.
 
 ```ts
-import { Decoder, encodeToPlain, encodeData, version } from '@canboat/wasm'
+import { Decoder, encodeToPlain, encodeData, version } from "@canboat/wasm";
 
 // Stateful line decoder: plain ("Actisense serial"), YDWG RAW,
 // iKonvert, Actisense ASCII … lines in (format sniffed like the
 // native reader), analyzer-shaped JSON out.
 //            camel  name-value  SI    coalesced
-const d = new Decoder(true, true, true, false)
-const json = d.decodeLine('2017-04-15T14:57:58.468Z,7,65359,204,255,8,3b,9f,ff,ff,ff,18,60,ff')
+const d = new Decoder(true, true, true, false);
+const json = d.decodeLine(
+  "2017-04-15T14:57:58.468Z,7,65359,204,255,8,3b,9f,ff,ff,ff,18,60,ff",
+);
 // -> '{"seatalkPilotHeading":{...,"description":"Seatalk: Pilot Heading",...}}'
 
 // JSON record (canboatjs or analyzer dialect) -> wire
-const line  = encodeToPlain(JSON.stringify(pgnObject), true)
-const bytes = encodeData(JSON.stringify(pgnObject), true) // Uint8Array of the PGN payload
+const line = encodeToPlain(JSON.stringify(pgnObject), true);
+const bytes = encodeData(JSON.stringify(pgnObject), true); // Uint8Array of the PGN payload
 ```
 
 `coalesced`: pass `true` when every line is a complete record (what the
@@ -52,7 +54,7 @@ lines with exactly 8 payload bytes go through fast-packet reassembly.
 ### canboatjs-compatibility shim
 
 ```ts
-import { FromPgn, toPgn, pgnToActisenseSerialFormat } from '@canboat/wasm'
+import { FromPgn, toPgn, pgnToActisenseSerialFormat } from "@canboat/wasm";
 ```
 
 Drop-in for the surface most consumers use: `FromPgn` (`parseString` +

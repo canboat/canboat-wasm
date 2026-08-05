@@ -6,15 +6,15 @@ export {
   Decoder,
   encodeToPlain,
   encodeData,
-  version
-} from '../pkg/canboat_wasm.js'
+  version,
+} from "../pkg/canboat_wasm.js";
 
 export {
   FromPgn,
   toPgn,
   pgnToActisenseSerialFormat,
   type PgnObject,
-  type FromPgnOptions
-} from './compat.js'
+  type FromPgnOptions,
+} from "./compat.js";
 
-export { unwrapAnalyzerOutput } from './vendor/analyzerOutput.js'
+export { unwrapAnalyzerOutput } from "./vendor/analyzerOutput.js";
