@@ -22,6 +22,7 @@ var index_exports = {};
 __export(index_exports, {
   Decoder: () => import_canboat_wasm2.Decoder,
   FromPgn: () => FromPgn,
+  TxEncoder: () => import_canboat_wasm2.TxEncoder,
   encodeData: () => import_canboat_wasm2.encodeData,
   encodeToPlain: () => import_canboat_wasm2.encodeToPlain,
   pgnToActisenseSerialFormat: () => pgnToActisenseSerialFormat,
@@ -138,6 +139,7 @@ function pgnToActisenseSerialFormat(pgnObject) {
 0 && (module.exports = {
   Decoder,
   FromPgn,
+  TxEncoder,
   encodeData,
   encodeToPlain,
   pgnToActisenseSerialFormat,

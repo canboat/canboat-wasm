@@ -4,6 +4,7 @@
 //     pgnToActisenseSerialFormat) for drop-in use by existing consumers.
 export {
   Decoder,
+  TxEncoder,
   encodeToPlain,
   encodeData,
   version,

@@ -1,6 +1,7 @@
 // ts/index.ts
 import {
   Decoder as Decoder2,
+  TxEncoder,
   encodeToPlain as encodeToPlain2,
   encodeData as encodeData2,
   version
@@ -111,6 +112,7 @@ function pgnToActisenseSerialFormat(pgnObject) {
 export {
   Decoder2 as Decoder,
   FromPgn,
+  TxEncoder,
   encodeData2 as encodeData,
   encodeToPlain2 as encodeToPlain,
   pgnToActisenseSerialFormat,

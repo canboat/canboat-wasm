@@ -16,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 # rev consciously: it changes the compiled brain.
 canboat-core = { git = "https://github.com/canboat/canboat", rev = "1d7450c5a3314ac6654998529138bed8f6c3678c" }
 canboat      = { git = "https://github.com/canboat/canboat", rev = "1d7450c5a3314ac6654998529138bed8f6c3678c", default-features = false, features = ["json-input"] }
+canboat-io   = { git = "https://github.com/canboat/canboat", rev = "1d7450c5a3314ac6654998529138bed8f6c3678c" }
 wasm-bindgen = "0.2"
 
 [profile.release]

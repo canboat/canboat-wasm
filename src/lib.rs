@@ -183,6 +183,82 @@ pub fn encode_data(json: &str, si: bool) -> Result<Vec<u8>, JsError> {
     Ok(frame_from_json_str(json, si)?.data.to_vec())
 }
 
+/// Stateful TX encoder: analyzer/canboatjs-shaped JSON records in,
+/// gateway-dialect wire lines out. Stateful because YDWG RAW transmits
+/// wire frames — a fast-packet payload leaves as multiple 8-byte
+/// frames whose sequence counter must advance per (pgn, dst) between
+/// sends, like any real transmitter.
+#[wasm_bindgen]
+pub struct TxEncoder {
+    si: bool,
+    seqs: std::collections::HashMap<(u32, u8), u8>,
+}
+
+#[wasm_bindgen]
+impl TxEncoder {
+    /// `si`: the unit system the JSON records' values are in.
+    #[wasm_bindgen(constructor)]
+    pub fn new(si: bool) -> TxEncoder {
+        TxEncoder {
+            si,
+            seqs: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Encode one record for `format`: `"plain"` (Actisense serial) and
+    /// `"n2k-ascii"` (Actisense W2K-1 ASCII) yield one coalesced line;
+    /// `"ydwg-raw"` yields one line per wire frame, fragmenting
+    /// fast-packet payloads per ISO 11783-3.
+    pub fn encode(&mut self, json: &str, format_name: &str) -> Result<Vec<String>, JsError> {
+        let frame = frame_from_json_str(json, self.si)?;
+        let mut line = String::with_capacity(64);
+        match format_name {
+            "plain" => {
+                format::plain::write_line(&mut line, &frame)
+                    .map_err(|e| JsError::new(&format!("format: {e}")))?;
+                Ok(vec![line])
+            }
+            "n2k-ascii" => {
+                format::actisense_ascii::write_line(&mut line, &frame)
+                    .map_err(|e| JsError::new(&format!("format: {e}")))?;
+                Ok(vec![line])
+            }
+            "ydwg-raw" => {
+                use canboat_io::fastpacket;
+                use std::fmt::Write as _;
+                // The device's transmit shape is a bare `<CANID> <bytes…>`
+                // line — no timestamp, no direction marker — exactly what
+                // the native line_gateway encoder writes.
+                let canid = format::iso11783_compose(frame.prio, frame.pgn, frame.src, frame.dst);
+                let write_one = |data: &[u8]| {
+                    let mut l = String::with_capacity(40);
+                    let _ = write!(l, "{canid:08X}");
+                    for b in data {
+                        let _ = write!(l, " {b:02X}");
+                    }
+                    l
+                };
+                if fastpacket::packet_type(frame.pgn) != FramePacketType::Fast {
+                    return Ok(vec![write_one(&frame.data)]);
+                }
+                let seq = {
+                    let slot = self.seqs.entry((frame.pgn, frame.src)).or_insert(0);
+                    let s = *slot;
+                    *slot = (s + 1) & 0x07;
+                    s
+                };
+                Ok(fastpacket::fragment(seq, &frame.data)
+                    .iter()
+                    .map(|chunk| write_one(&chunk[..]))
+                    .collect())
+            }
+            other => Err(JsError::new(&format!(
+                "unknown TX format '{other}' (plain | n2k-ascii | ydwg-raw)"
+            ))),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
