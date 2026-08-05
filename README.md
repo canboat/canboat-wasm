@@ -25,9 +25,11 @@ canboat/signalk test harnesses:
 
 ## API
 
-```js
-const { Decoder, encodeToPlain, encodeData, version, compat } =
-  require('@canboat/wasm')
+Strict TypeScript, ESM-first with a CJS build — `import` and `require`
+both work.
+
+```ts
+import { Decoder, encodeToPlain, encodeData, version } from '@canboat/wasm'
 
 // Stateful line decoder: plain ("Actisense serial"), YDWG RAW,
 // iKonvert, Actisense ASCII … lines in (format sniffed like the
@@ -49,9 +51,8 @@ lines with exactly 8 payload bytes go through fast-packet reassembly.
 
 ### canboatjs-compatibility shim
 
-```js
-const { FromPgn, toPgn, pgnToActisenseSerialFormat } =
-  require('@canboat/wasm').compat
+```ts
+import { FromPgn, toPgn, pgnToActisenseSerialFormat } from '@canboat/wasm'
 ```
 
 Drop-in for the surface most consumers use: `FromPgn` (`parseString` +

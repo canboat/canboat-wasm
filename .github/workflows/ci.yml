@@ -30,11 +30,17 @@ jobs:
       - name: Native unit tests
         run: cargo test
 
+      - name: Rustfmt
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
       - name: Install wasm-pack
         run: npm install -g wasm-pack
 
-      - name: Build wasm package
-        run: wasm-pack build --release --target nodejs
+      - name: Build wasm
+        run: npm run build:wasm
 
       - name: Report size
         run: |
@@ -42,13 +48,14 @@ jobs:
           gzip -c pkg/canboat_wasm_bg.wasm | wc -c \
             | awk '{printf "wasm gzipped: %.0f KB\n", $1/1024}'
 
-      - name: Smoke tests
-        run: |
-          npm install
-          npm test
+      - name: Install JS dependencies
+        run: npm install
 
-      - name: Rustfmt
-        run: cargo fmt --check
+      - name: Typecheck (strict)
+        run: npm run typecheck
 
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+      - name: Build dual ESM/CJS output
+        run: npm run build:ts
+
+      - name: Smoke tests (ESM + CJS entries)
+        run: npm test
