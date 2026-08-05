@@ -1,0 +1,23 @@
+{
+  "name": "@canboat/wasm",
+  "version": "0.1.0",
+  "description": "WebAssembly build of the canboat NMEA 2000 decoder/encoder — the canboat wire brain as a pure-npm, in-process package.",
+  "main": "js/index.js",
+  "files": [
+    "js/",
+    "pkg/"
+  ],
+  "scripts": {
+    "build": "wasm-pack build --release --target nodejs",
+    "test": "node test/smoke.cjs",
+    "prepack": "npm run build"
+  },
+  "repository": "https://github.com/canboat/canboat-wasm",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@canboat/ts-pgns": "1.11.x"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
