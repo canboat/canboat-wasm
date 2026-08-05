@@ -12,12 +12,10 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # The wire brain comes from the canboat repo itself — one codebase,
-# compiled here for wasm32. Pinned to the branch carrying the two
-# prerequisites (wasm32 target fixes in canboat-core, the json-input
-# library feature in canboat); repoint to canboat/canboat master once
-# those are merged upstream.
-canboat-core = { git = "https://github.com/dirkwa/canboat-fork", rev = "1b5518b93b8c48c92c4b28f2cb1663f981106c61" }
-canboat      = { git = "https://github.com/dirkwa/canboat-fork", rev = "1b5518b93b8c48c92c4b28f2cb1663f981106c61", default-features = false, features = ["json-input"] }
+# compiled here for wasm32, pinned to an upstream revision. Bump the
+# rev consciously: it changes the compiled brain.
+canboat-core = { git = "https://github.com/canboat/canboat", rev = "1d7450c5a3314ac6654998529138bed8f6c3678c" }
+canboat      = { git = "https://github.com/canboat/canboat", rev = "1d7450c5a3314ac6654998529138bed8f6c3678c", default-features = false, features = ["json-input"] }
 wasm-bindgen = "0.2"
 
 [profile.release]
