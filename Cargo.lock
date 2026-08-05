@@ -56,7 +56,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 [[package]]
 name = "canboat"
 version = "8.0.0-beta1"
-source = "git+https://github.com/dirkwa/canboat-fork?rev=e72dc9d14561be0eec80bdca420da823fb3bdcdc#e72dc9d14561be0eec80bdca420da823fb3bdcdc"
+source = "git+https://github.com/canboat/canboat?rev=d7f47d82f527b3af3c31817862deb97bdf6ebae0#d7f47d82f527b3af3c31817862deb97bdf6ebae0"
 dependencies = [
  "anyhow",
  "canboat-core",
@@ -68,7 +68,7 @@ dependencies = [
 [[package]]
 name = "canboat-core"
 version = "8.0.0-beta1"
-source = "git+https://github.com/dirkwa/canboat-fork?rev=e72dc9d14561be0eec80bdca420da823fb3bdcdc#e72dc9d14561be0eec80bdca420da823fb3bdcdc"
+source = "git+https://github.com/canboat/canboat?rev=d7f47d82f527b3af3c31817862deb97bdf6ebae0#d7f47d82f527b3af3c31817862deb97bdf6ebae0"
 dependencies = [
  "canboat-schema",
  "indexmap",
@@ -81,7 +81,7 @@ dependencies = [
 [[package]]
 name = "canboat-io"
 version = "8.0.0-beta1"
-source = "git+https://github.com/dirkwa/canboat-fork?rev=e72dc9d14561be0eec80bdca420da823fb3bdcdc#e72dc9d14561be0eec80bdca420da823fb3bdcdc"
+source = "git+https://github.com/canboat/canboat?rev=d7f47d82f527b3af3c31817862deb97bdf6ebae0#d7f47d82f527b3af3c31817862deb97bdf6ebae0"
 dependencies = [
  "canboat-core",
  "flate2",
@@ -95,7 +95,7 @@ dependencies = [
 [[package]]
 name = "canboat-schema"
 version = "8.0.0-beta1"
-source = "git+https://github.com/dirkwa/canboat-fork?rev=e72dc9d14561be0eec80bdca420da823fb3bdcdc#e72dc9d14561be0eec80bdca420da823fb3bdcdc"
+source = "git+https://github.com/canboat/canboat?rev=d7f47d82f527b3af3c31817862deb97bdf6ebae0#d7f47d82f527b3af3c31817862deb97bdf6ebae0"
 
 [[package]]
 name = "canboat-wasm"

@@ -69,6 +69,10 @@ impl Decoder {
                 } else {
                     CamelCase::Off
                 },
+                // canboat#814 unbundled the PGN-id wrapper from camel;
+                // this package's output contract predates that, so pin
+                // the old coupling: camel output stays wrapped.
+                wrap: camel,
                 ..JsonOptions::default()
             },
             coalesced,
@@ -315,6 +319,8 @@ impl ByteDecoder {
                 } else {
                     CamelCase::Off
                 },
+                // Same wrap pin as Decoder — see the comment there.
+                wrap: camel,
                 ..JsonOptions::default()
             },
             pending_tx: Vec::new(),

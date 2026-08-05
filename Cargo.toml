@@ -14,13 +14,10 @@ crate-type = ["cdylib", "rlib"]
 # The wire brain comes from the canboat repo itself — one codebase,
 # compiled here for wasm32, pinned to an upstream revision. Bump the
 # rev consciously: it changes the compiled brain.
-# TEMPORARY staging pin: canboat master + canboat#815 (SI+camel
-# defaults) + canboat#816 (absent count encodes zero) from the fork's
-# wasm-brain-stack, for field testing ahead of the merges. Repoint to
-# canboat/canboat as soon as both land.
-canboat-core = { git = "https://github.com/dirkwa/canboat-fork", rev = "e72dc9d14561be0eec80bdca420da823fb3bdcdc" }
-canboat      = { git = "https://github.com/dirkwa/canboat-fork", rev = "e72dc9d14561be0eec80bdca420da823fb3bdcdc", default-features = false, features = ["json-input"] }
-canboat-io   = { git = "https://github.com/dirkwa/canboat-fork", rev = "e72dc9d14561be0eec80bdca420da823fb3bdcdc" }
+# rev = canboat master at the canboat#816 merge.
+canboat-core = { git = "https://github.com/canboat/canboat", rev = "d7f47d82f527b3af3c31817862deb97bdf6ebae0" }
+canboat      = { git = "https://github.com/canboat/canboat", rev = "d7f47d82f527b3af3c31817862deb97bdf6ebae0", default-features = false, features = ["json-input"] }
+canboat-io   = { git = "https://github.com/canboat/canboat", rev = "d7f47d82f527b3af3c31817862deb97bdf6ebae0" }
 wasm-bindgen = "0.2"
 
 [profile.release]
