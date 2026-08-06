@@ -36,14 +36,20 @@ decoding/encoding belongs upstream in canboat (usually in its
   `noUncheckedIndexedAccess`) must pass; tsup emits both formats plus
   declarations; both smoke suites must pass. The wasm-pack glue stays
   a CJS runtime module loaded externally — never bundle it.
-- **The Cargo pin is deliberate.** Bump the `rev` consciously (it
-  changes the compiled brain) and say so in the commit message. Once
-  the wasm32 prerequisites are merged upstream, the pin moves to
-  `canboat/canboat`.
-- **Publishing is tag-triggered CI, never a laptop.** Pushing a
-  `vX.Y.Z` tag publishes to npm via OIDC trusted publishing and cuts a
-  GitHub Release with generated notes. Prerelease versions publish
-  under the `next` dist-tag and never move `latest`.
+- **The Cargo pin is deliberate — and normally machine-moved.** The
+  `track-canboat` workflow follows canboat releases (alphas and betas
+  included) and opens a PR moving the pin to the release tag, carrying
+  a `Release-As:` footer so release-please releases this package under
+  the **same version as the canboat brain it compiles**. Manual pin
+  bumps are for emergencies only; say why in the commit message.
+- **Publishing is release-please + tag-triggered CI, never a laptop.**
+  Merging a `track-canboat` PR makes release-please propose
+  `chore: release X.Y.Z`; merging that tags `vX.Y.Z`, writes
+  `CHANGELOG.md`, cuts the GitHub Release, and the tag triggers
+  `publish.yml` (npm via OIDC trusted publishing). Prerelease versions
+  publish under the `next` dist-tag and never move `latest`. When
+  squash-merging a PR whose commit carries a `Release-As:` footer,
+  keep the footer in the squash message — it pins the version.
 
 ## Workflow
 
@@ -53,4 +59,6 @@ decoding/encoding belongs upstream in canboat (usually in its
   read-only `ci-lint` and rejects drift. Rust side: `cargo fmt` and
   clippy with `-D warnings`.
 - Full local check: `npm run build && npm run typecheck && npm test`.
-- No hand-written changelog — the Releases page is the changelog.
+- No hand-written changelog — release-please generates `CHANGELOG.md`
+  and the Release notes from conventional commits; never edit either
+  by hand.

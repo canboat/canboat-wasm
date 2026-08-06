@@ -1,0 +1,58 @@
+name: release-please
+
+# Same release machinery as canboat itself: release-please maintains a
+# release PR from conventional commits; merging it tags vX.Y.Z and cuts
+# the GitHub Release, and the tag triggers publish.yml (npm via OIDC).
+# Version steering follows canboat's convention — a commit with a
+# `Release-As: X.Y.Z` footer (the track-canboat workflow writes one for
+# every canboat release) pins the next version exactly, so this package
+# always releases under the canboat version whose brain it compiles.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      pr: ${{ steps.rp.outputs.pr }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: rp
+        with:
+          # A PAT (RELEASE_PLEASE_TOKEN) is preferred so CI runs on the
+          # release PR. Falls back to GITHUB_TOKEN.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+  # release-please bumps package.json and (via the x-release-please-version
+  # annotation) the crate version in Cargo.toml, but Cargo.lock records a
+  # version for the workspace member too — a bumped Cargo.toml with a stale
+  # Cargo.lock breaks `cargo --locked` builds on the release PR, so re-stamp
+  # it on the release branch. --workspace touches only the member package;
+  # third-party pins stay exactly as locked.
+  regenerate:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.pr != '' && needs.release-please.outputs.pr != 'null' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ fromJson(needs.release-please.outputs.pr).headBranchName }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: re-stamp Cargo.lock
+        run: cargo update --workspace
+
+      - name: commit re-stamped lockfile
+        run: |
+          if ! git diff --exit-code; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "chore: re-stamp Cargo.lock for release"
+            git push
+          fi

@@ -1,0 +1,125 @@
+name: track-canboat
+
+# Follows canboat releases (including alphas/betas). When canboat cuts
+# vX.Y.Z, this opens a PR that moves the Cargo pin to that tag, with a
+# `Release-As: X.Y.Z` footer — canboat's own convention for steering
+# release-please (see canboat#782/#817). Merging the PR makes
+# release-please propose "chore: release X.Y.Z"; merging *that* tags,
+# cuts the Release, and publish.yml ships the npm package — so the npm
+# version always names the canboat brain it compiles.
+#
+# The full check runs here, before the PR is opened: a PR created with
+# the default GITHUB_TOKEN does not trigger CI workflows (set a
+# RELEASE_PLEASE_TOKEN PAT to get CI on these PRs too).
+
+on:
+  schedule:
+    - cron: "35 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "canboat tag to track (default: latest release)"
+        required: false
+  repository_dispatch:
+    types: [canboat-release]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Determine target canboat release
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag || github.event.client_payload.tag || '' }}"
+          EXPLICIT="yes"
+          if [ -z "$TAG" ]; then
+            EXPLICIT="no"
+            # The releases list includes prereleases; the "latest"
+            # endpoint would skip alphas/betas.
+            TAG=$(gh api repos/canboat/canboat/releases --jq '.[0].tag_name')
+          fi
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::'$TAG' is not a vX.Y.Z tag"; exit 1 ;;
+          esac
+          CURRENT=$(grep -oEm1 '(tag|rev) = "[^"]+"' Cargo.toml | cut -d'"' -f2)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          if [ "$CURRENT" = "$TAG" ]; then
+            echo "Already pinned to $TAG"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git ls-remote --exit-code origin "refs/heads/track-canboat-$TAG" >/dev/null 2>&1; then
+            echo "Tracking branch for $TAG already exists"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Never auto-downgrade: an auto-detected release must be newer
+          # than the commit currently pinned (the pin may sit ahead of
+          # the newest release, e.g. on a master rev). An explicit tag
+          # from dispatch input bypasses this — deliberate rebuilds and
+          # rollbacks stay possible.
+          if [ "$EXPLICIT" = "no" ]; then
+            TAG_DATE=$(gh api "repos/canboat/canboat/commits/$TAG" --jq .commit.committer.date)
+            CUR_DATE=$(gh api "repos/canboat/canboat/commits/$CURRENT" --jq .commit.committer.date 2>/dev/null || echo "")
+            if [ -n "$CUR_DATE" ] && [ ! "$TAG_DATE" \> "$CUR_DATE" ]; then
+              echo "Release $TAG ($TAG_DATE) is not newer than the pinned $CURRENT ($CUR_DATE)"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Move the pin
+        if: steps.target.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          sed -i -E 's%(git = "https://github\.com/canboat/canboat", )(tag|rev) = "[^"]+"%\1tag = "${{ steps.target.outputs.tag }}"%' Cargo.toml
+          grep -c 'tag = "${{ steps.target.outputs.tag }}"' Cargo.toml | grep -qx 3
+          cargo update -p canboat -p canboat-core -p canboat-io -p canboat-schema
+
+      - name: Install Rust with wasm target
+        if: steps.target.outputs.skip == 'false'
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        if: steps.target.outputs.skip == 'false'
+        run: npm install -g wasm-pack
+
+      - name: Build, typecheck and test against the new brain
+        if: steps.target.outputs.skip == 'false'
+        run: |
+          npm install
+          npm run build
+          npm run typecheck
+          npm test
+
+      - name: Open the tracking PR
+        if: steps.target.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.target.outputs.tag }}
+          VERSION: ${{ steps.target.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "track-canboat-$TAG"
+          git add Cargo.toml Cargo.lock
+          git commit -m "feat: canboat $TAG" -m "Release-As: $VERSION"
+          git push origin "track-canboat-$TAG"
+          gh pr create \
+            --title "feat: canboat $TAG" \
+            --body "$(printf 'Moves the brain pin to [canboat %s](https://github.com/canboat/canboat/releases/tag/%s). Build, typecheck and both smoke suites passed against the new pin in the [tracking run](%s).\n\nMerging this makes release-please propose **chore: release %s**; merging that tags and publishes `@canboat/wasm@%s` to npm.\n\n⚠️ If squash-merging, keep the footer below in the squash commit message — it is what pins the release version.\n\nRelease-As: %s' "$TAG" "$TAG" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$VERSION" "$VERSION" "$VERSION")"

@@ -59,21 +59,11 @@ jobs:
           npm run typecheck
           npm test
 
+      # The GitHub Release itself is cut by release-please when the
+      # release PR merges (it owns the tag and CHANGELOG.md); this
+      # workflow only pushes the package to npm. If the publish fails,
+      # re-run it — the tag and Release already exist.
       - name: Publish to npm
         run: npm publish --access public --tag "${{ steps.version.outputs.dist_tag }}"
         env:
           NPM_CONFIG_PROVENANCE: "true"
-
-  # Separate job gated on publish, so a failed npm push can never leave
-  # a Release pointing at a version that never reached the registry.
-  release:
-    needs: publish
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Create GitHub Release with generated notes
-        uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}

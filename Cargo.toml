@@ -1,6 +1,6 @@
 [package]
 name        = "canboat-wasm"
-version     = "0.1.0"
+version     = "0.1.0" # x-release-please-version
 edition     = "2024"
 license     = "Apache-2.0"
 authors     = ["Kees Verruijt <canboat@verruijt.net>"]
@@ -12,9 +12,11 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # The wire brain comes from the canboat repo itself — one codebase,
-# compiled here for wasm32, pinned to an upstream revision. Bump the
-# rev consciously: it changes the compiled brain.
-# rev = canboat master at the canboat#816 merge.
+# compiled here for wasm32, pinned to an upstream revision. Bumping the
+# pin changes the compiled brain: it happens via the track-canboat
+# workflow, which follows canboat releases and moves the pin to the
+# release tag (current pin: master at the canboat#816 merge, awaiting
+# the first tracked release).
 canboat-core = { git = "https://github.com/canboat/canboat", rev = "d7f47d82f527b3af3c31817862deb97bdf6ebae0" }
 canboat      = { git = "https://github.com/canboat/canboat", rev = "d7f47d82f527b3af3c31817862deb97bdf6ebae0", default-features = false, features = ["json-input"] }
 canboat-io   = { git = "https://github.com/canboat/canboat", rev = "d7f47d82f527b3af3c31817862deb97bdf6ebae0" }
