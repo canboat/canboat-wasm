@@ -16,6 +16,10 @@ interface FromPgnOptions {
     /** Accepted for canboatjs signature compatibility; camelCase output
      * is always on — it is the convention the whole pipeline expects. */
     useCamel?: boolean;
+    /** Decode against the J1939 schema flavor (engines/gensets on plain
+     * J1939 buses) instead of NMEA 2000. Table choice is exclusive; the
+     * shared ISO PGNs exist in both. */
+    j1939?: boolean;
 }
 declare class FromPgn extends EventEmitter {
     private readonly decoder;

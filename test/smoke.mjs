@@ -117,6 +117,39 @@ assert.match(version(), /^\d+\.\d+\.\d+/);
   assert.ok(errored, "shim reports bad input via the error event");
 }
 
+// J1939 flavor: candump pretty input, EEC1 resolves in the J1939
+// table (the default flavor only has the range catch-all there), and
+// the shim stamps a timestamp for the timestamp-less candump shape.
+{
+  const p = new FromPgn({ j1939: true });
+  const pgn = p.parseString("  can0  0CF00400   [8]  FF FF FF 8A 03 FF FF FF");
+  assert.strictEqual(pgn.pgn, 61444);
+  assert.strictEqual(pgn.description, "ECU #1");
+  assert.strictEqual(pgn.fields.engineRpm, 113.2);
+  assert.ok(pgn.timestamp, "candump lines get a receive timestamp");
+  const n2k = new FromPgn();
+  const fallback = n2k.parseString(
+    "  can0  0CF00400   [8]  FF FF FF 8A 03 FF FF FF",
+  );
+  assert.notStrictEqual(fallback.description, "ECU #1");
+}
+
+// J1939 flavor: ISO-TP BAM reassembly (DM1 trouble codes across
+// TP.CM + two TP.DT frames).
+{
+  const d = new Decoder(true, true, true, false, true);
+  assert.strictEqual(
+    d.decodeLine("  can0  1CECFF00   [8]  20 0A 00 02 FF CA FE 00"),
+    undefined,
+  );
+  assert.strictEqual(
+    d.decodeLine("  can0  1CEBFF00   [8]  01 00 FF 01 02 03 04 05"),
+    undefined,
+  );
+  const out = d.decodeLine("  can0  1CEBFF00   [8]  02 06 07 08 FF FF FF FF");
+  assert.ok(out.includes('"activeTroubleCodes"'), "BAM reassembles to DM1");
+}
+
 console.log("smoke (esm): all assertions passed");
 
 // ByteDecoder: kind validation, init/keepalive/TX byte builders.

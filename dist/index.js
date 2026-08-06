@@ -82,7 +82,7 @@ var FromPgn = class extends EventEmitter {
   options;
   constructor(options = {}) {
     super();
-    this.decoder = new Decoder(true, true, true, false);
+    this.decoder = new Decoder(true, true, true, false, options.j1939 === true);
     this.options = options;
   }
   parseString(line) {
@@ -100,6 +100,9 @@ var FromPgn = class extends EventEmitter {
       return void 0;
     }
     const pgn = unwrapAnalyzerOutput(JSON.parse(out));
+    if (pgn.timestamp === void 0) {
+      pgn.timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    }
     this.emit("pgn", pgn);
     return pgn;
   }
