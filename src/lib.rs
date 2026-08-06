@@ -24,8 +24,13 @@ pub fn version() -> String {
     canboat_core::CANBOAT_JSON_VERSION.to_string()
 }
 
-fn database(si: bool) -> &'static PgnDatabase {
-    PgnDatabase::embedded(if si { Units::Si } else { Units::Metric })
+fn database(si: bool, j1939: bool) -> &'static PgnDatabase {
+    let units = if si { Units::Si } else { Units::Metric };
+    if j1939 {
+        PgnDatabase::embedded_j1939(units)
+    } else {
+        PgnDatabase::embedded(units)
+    }
 }
 
 /// Stateful line decoder: plain-format ("Actisense serial") lines in,
@@ -57,10 +62,20 @@ impl Decoder {
     /// canboatjs-style heuristic — lines with more than 8 payload
     /// bytes are complete, 8-and-under go through fast-packet
     /// reassembly.
+    /// `j1939` (optional, default false): decode against the J1939
+    /// schema flavor (`canboat convert --j1939`) — for plain J1939
+    /// buses (engines, gensets). Table choice is exclusive; ISO-TP
+    /// (BAM + RTS/CTS) reassembly works in both flavors.
     #[wasm_bindgen(constructor)]
-    pub fn new(camel: bool, name_value: bool, si: bool, coalesced: bool) -> Decoder {
+    pub fn new(
+        camel: bool,
+        name_value: bool,
+        si: bool,
+        coalesced: bool,
+        j1939: Option<bool>,
+    ) -> Decoder {
         Decoder {
-            db: database(si),
+            db: database(si, j1939.unwrap_or(false)),
             reasm: Reassembler::new(),
             opts: JsonOptions {
                 name_value,
@@ -120,7 +135,9 @@ impl Decoder {
         // pass `coalesced` when the stream is known to be complete
         // records, as the native converter assumes.)
         let complete = match fmt {
-            format::InputFormat::Ydwg02 | format::InputFormat::Airmar => false,
+            format::InputFormat::Ydwg02
+            | format::InputFormat::Airmar
+            | format::InputFormat::Candump => false,
             format::InputFormat::Plain | format::InputFormat::PlainMixFast => {
                 self.coalesced || frame.data.len() != 8
             }
@@ -161,7 +178,7 @@ impl Decoder {
 }
 
 fn frame_from_json_str(json: &str, si: bool) -> Result<RawFrame, JsError> {
-    match canboat::json_input::frame_from_json(database(si), json.trim()) {
+    match canboat::json_input::frame_from_json(database(si, false), json.trim()) {
         Ok(Some(frame)) => Ok(frame),
         Ok(None) => Err(JsError::new("record is synthetic (no wire form)")),
         Err(e) => Err(JsError::new(&format!("{e:#}"))),
@@ -311,7 +328,7 @@ impl ByteDecoder {
         };
         Ok(ByteDecoder {
             kind,
-            db: database(si),
+            db: database(si, false),
             opts: JsonOptions {
                 name_value,
                 camel_case: if camel {

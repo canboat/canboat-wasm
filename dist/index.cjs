@@ -108,7 +108,7 @@ var FromPgn = class extends import_node_events.EventEmitter {
   options;
   constructor(options = {}) {
     super();
-    this.decoder = new import_canboat_wasm.Decoder(true, true, true, false);
+    this.decoder = new import_canboat_wasm.Decoder(true, true, true, false, options.j1939 === true);
     this.options = options;
   }
   parseString(line) {
@@ -126,6 +126,9 @@ var FromPgn = class extends import_node_events.EventEmitter {
       return void 0;
     }
     const pgn = unwrapAnalyzerOutput(JSON.parse(out));
+    if (pgn.timestamp === void 0) {
+      pgn.timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    }
     this.emit("pgn", pgn);
     return pgn;
   }

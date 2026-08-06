@@ -24,6 +24,10 @@ export interface FromPgnOptions {
   /** Accepted for canboatjs signature compatibility; camelCase output
    * is always on — it is the convention the whole pipeline expects. */
   useCamel?: boolean;
+  /** Decode against the J1939 schema flavor (engines/gensets on plain
+   * J1939 buses) instead of NMEA 2000. Table choice is exclusive; the
+   * shared ISO PGNs exist in both. */
+  j1939?: boolean;
 }
 
 export class FromPgn extends EventEmitter {
@@ -35,7 +39,7 @@ export class FromPgn extends EventEmitter {
     // camel + name-value + SI: the lossless analyzer form, normalized
     // below to the exact canboatjs field conventions. Each instance
     // owns its fast-packet reassembler, like canboatjs.
-    this.decoder = new Decoder(true, true, true, false);
+    this.decoder = new Decoder(true, true, true, false, options.j1939 === true);
     this.options = options;
   }
 
@@ -54,6 +58,12 @@ export class FromPgn extends EventEmitter {
       return undefined; // fast-packet still assembling
     }
     const pgn = unwrapAnalyzerOutput(JSON.parse(out)) as PgnObject;
+    // canboatjs always emits a timestamp, stamping receive time when
+    // the input line carries none (e.g. candump's pretty shape) —
+    // n2k-signalk's mapper relies on it.
+    if (pgn.timestamp === undefined) {
+      pgn.timestamp = new Date().toISOString();
+    }
     this.emit("pgn", pgn);
     return pgn;
   }
