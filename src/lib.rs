@@ -450,7 +450,7 @@ mod tests {
 
     #[test]
     fn ydwg_lines_do_not_panic() {
-        let mut d = Decoder::new(true, true, true, false);
+        let mut d = Decoder::new(true, true, true, false, None);
         let lines = [
             "17:29:52.256 R 19F9050A 20 59 01 00 03 00 00 00",
             "17:29:52.256 R 19F9050A 21 00 00 00 00 00 00 00",
@@ -458,5 +458,15 @@ mod tests {
         for l in lines {
             let _ = d.decode_line(l);
         }
+    }
+
+    #[test]
+    fn j1939_flavor_decodes_candump_eec1() {
+        let mut d = Decoder::new(true, true, true, false, Some(true));
+        let out = d
+            .decode_line("  can0  0CF00400   [8]  FF FF FF 8A 03 FF FF FF")
+            .expect("decodes")
+            .expect("complete record");
+        assert!(out.contains("\"ecu1\""), "got: {out}");
     }
 }
