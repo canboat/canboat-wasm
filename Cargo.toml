@@ -18,9 +18,9 @@ crate-type = ["cdylib", "rlib"]
 # release tag (current pin: master at the canboat#820 merge — the
 # J1939 schema flavor; ahead of the newest release by design, the
 # tracker's never-downgrade guard skips until a newer release exists).
-canboat-core = { git = "https://github.com/canboat/canboat", rev = "bdd469d8f7cece4ea5c88d311abe432b4ed74b65" }
-canboat      = { git = "https://github.com/canboat/canboat", rev = "bdd469d8f7cece4ea5c88d311abe432b4ed74b65", default-features = false, features = ["json-input"] }
-canboat-io   = { git = "https://github.com/canboat/canboat", rev = "bdd469d8f7cece4ea5c88d311abe432b4ed74b65" }
+canboat-core = { git = "https://github.com/canboat/canboat", tag = "v8.0.0-beta3" }
+canboat      = { git = "https://github.com/canboat/canboat", tag = "v8.0.0-beta3", default-features = false, features = ["json-input"] }
+canboat-io   = { git = "https://github.com/canboat/canboat", tag = "v8.0.0-beta3" }
 wasm-bindgen = "0.2"
 
 [profile.release]
