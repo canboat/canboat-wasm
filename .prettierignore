@@ -2,3 +2,5 @@ pkg/
 dist/
 target/
 Cargo.lock
+# release-please owns this file verbatim; never hand-edited, never linted
+CHANGELOG.md
