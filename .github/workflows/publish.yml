@@ -3,10 +3,18 @@ name: Publish
 # Publishing is tag-triggered CI, never a laptop. The glob is tight and
 # dotted on purpose: a bare v* fires on `vnext`, and even v[0-9]* is
 # unanchored after the digit (a `v1-anything` tag would match).
+#
+# workflow_dispatch is the escape hatch for a GitHub Actions rule, not
+# a convenience: release-please pushes the release tag with
+# GITHUB_TOKEN, and tag pushes made by that token never trigger other
+# workflows. Dispatch this workflow ON the tag ref
+# (gh workflow run publish.yml --ref vX.Y.Z) — the version validation
+# below reads GITHUB_REF_NAME and refuses anything but a semver tag.
 on:
   push:
     tags:
       - "v[0-9]*.[0-9]*.[0-9]*"
+  workflow_dispatch:
 
 jobs:
   publish:
