@@ -1,0 +1,46 @@
+# Weekly dependency updates, one grouped PR per ecosystem — same cadence
+# and grouping as canboat's config. Two local deviations:
+#
+# - Commit-message prefixes are set because release-please generates the
+#   changelog from main's conventional commits; ci/build land in the
+#   hidden "Internal" section instead of polluting release notes.
+# - The cargo ecosystem must never touch the canboat git dependency:
+#   that pin is machine-moved by the track-canboat workflow in lockstep
+#   with canboat releases (see AGENTS.md). Dependabot does not bump git
+#   dependencies today; the ignore makes the intent explicit anyway.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    ignore:
+      - dependency-name: "canboat*"
+    groups:
+      cargo:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    groups:
+      npm:
+        patterns:
+          - "*"
