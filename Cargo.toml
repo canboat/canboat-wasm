@@ -1,6 +1,6 @@
 [package]
 name        = "canboat-wasm"
-version     = "0.1.0" # x-release-please-version
+version     = "8.0.0-beta3" # x-release-please-version
 edition     = "2024"
 license     = "Apache-2.0"
 authors     = ["Kees Verruijt <canboat@verruijt.net>"]
