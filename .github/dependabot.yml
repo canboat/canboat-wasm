@@ -40,6 +40,12 @@ updates:
       interval: weekly
     commit-message:
       prefix: build
+    ignore:
+      # typescript-eslint's peer range is typescript >=4.8.4 <6.1.0
+      # (checked at 8.67.0) — TypeScript beyond that makes npm install
+      # fail with ERESOLVE. Lift when typescript-eslint widens the range.
+      - dependency-name: "typescript"
+        versions: [">=6.1.0"]
     groups:
       npm:
         patterns:
