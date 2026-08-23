@@ -22,12 +22,21 @@ jobs:
     outputs:
       pr: ${{ steps.rp.outputs.pr }}
     steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - uses: googleapis/release-please-action@v5
         id: rp
         with:
-          # A PAT (RELEASE_PLEASE_TOKEN) is preferred so CI runs on the
-          # release PR. Falls back to GITHUB_TOKEN.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          # A GitHub App token, never GITHUB_TOKEN. Two reasons: a tag
+          # pushed with GITHUB_TOKEN does not trigger publish.yml (so
+          # releases would never reach npm), and CI does not run on a PR
+          # opened by it. An App installation token has no expiry date to
+          # forget, unlike a PAT.
+          token: ${{ steps.app-token.outputs.token }}
 
   # release-please bumps package.json and (via the x-release-please-version
   # annotation) the crate version in Cargo.toml, but Cargo.lock records a
@@ -40,10 +49,18 @@ jobs:
     if: ${{ needs.release-please.outputs.pr != '' && needs.release-please.outputs.pr != 'null' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v7
         with:
           ref: ${{ fromJson(needs.release-please.outputs.pr).headBranchName }}
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          # Pushing the re-stamped lockfile with GITHUB_TOKEN would also
+          # skip CI on the release PR.
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: re-stamp Cargo.lock
         run: cargo update --workspace
