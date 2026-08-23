@@ -1,32 +1,40 @@
-# canboat-wasm
+# @canboat/wasm
 
-The [canboat](https://github.com/canboat/canboat) NMEA 2000
-decoder/encoder compiled to WebAssembly: the canboat wire brain as a
-pure-npm, in-process package — no native addon, no binary download.
+The [canboat](https://github.com/canboat/canboat) NMEA 2000 decoder/encoder
+compiled to WebAssembly. It runs in-process as an ordinary npm dependency,
+with no native addon to build and no binary to download.
 
-This is **the same Rust code** as the native `canboat` binary, compiled
-for `wasm32-unknown-unknown`. Not a port, not a re-implementation: one
-codebase, two build targets, byte-identical output.
+The Rust source is the same source the native `canboat` binary is built from,
+here targeting `wasm32-unknown-unknown`. One codebase, two build targets.
 
-## Status
+## Install
 
-Working, verified, **not yet published to npm**. Verified against the
-canboat/signalk test harnesses:
+```sh
+npm install @canboat/wasm
+```
 
-- RX **byte-identical** to the native `canboat convert` across a
-  7595-record live NMEA 2000 capture.
-- Signal K delta parity equal to the native analyzer baseline over the
-  canboatjs test corpus.
-- TX identical to the native encoder on every corpus object both can
-  encode; 1311/1311 canName byte parity vs canboatjs `toPgn`.
-- ~1.4 MB wasm (≈470 KB gzipped). Decode throughput ≈5 µs/line
-  in-process — ~2.8× faster than canboatjs, and ahead of the native
-  binary running as a child process (which pays pipe overhead).
+The package version names the canboat release it compiles, so
+`@canboat/wasm@8.0.0-beta3` carries the wire brain from canboat `v8.0.0-beta3`.
+
+## Parity
+
+Checked against the canboat and Signal K test harnesses:
+
+- RX output is byte-identical to native `canboat convert` over a 7595-record
+  live NMEA 2000 capture.
+- Signal K deltas match the native analyzer baseline across the canboatjs test
+  corpus.
+- TX output matches the native encoder on every corpus object both can encode,
+  with 1311/1311 canName byte parity against canboatjs `toPgn`.
+
+The wasm binary is 1.55 MB (about 530 KB gzipped). Decoding costs roughly 5 µs
+per line in-process, which is about 2.8× faster than canboatjs and faster than
+the native binary run as a child process, since that pays pipe overhead.
 
 ## API
 
-Strict TypeScript, ESM-first with a CJS build — `import` and `require`
-both work.
+TypeScript types are included. The package is ESM-first with a CJS build, so
+`import` and `require` both work.
 
 ```ts
 import { Decoder, encodeToPlain, encodeData, version } from "@canboat/wasm";
@@ -46,9 +54,9 @@ const line = encodeToPlain(JSON.stringify(pgnObject), true);
 const bytes = encodeData(JSON.stringify(pgnObject), true); // Uint8Array of the PGN payload
 ```
 
-`coalesced`: pass `true` when every line is a complete record (what the
-native converter assumes for plain text, e.g. logs written by the
-canboat gateway readers); `false` applies the canboatjs convention —
+Set `coalesced` to `true` when every line is a complete record, which is what
+the native converter assumes for plain text such as logs written by the canboat
+gateway readers. Setting it to `false` applies the canboatjs convention, where
 lines with exactly 8 payload bytes go through fast-packet reassembly.
 
 ### canboatjs-compatibility shim
@@ -57,18 +65,18 @@ lines with exactly 8 payload bytes go through fast-packet reassembly.
 import { FromPgn, toPgn, pgnToActisenseSerialFormat } from "@canboat/wasm";
 ```
 
-Drop-in for the surface most consumers use: `FromPgn` (`parseString` +
-`'pgn'`/`'error'` events, canboatjs-shaped output objects), `toPgn`
-(Buffer of payload bytes), `pgnToActisenseSerialFormat`.
+These cover the surface most consumers use: `FromPgn` (`parseString` plus
+`'pgn'` and `'error'` events, returning canboatjs-shaped objects), `toPgn`
+(a Buffer of payload bytes), and `pgnToActisenseSerialFormat`.
 
 ## Scope
 
-This package is a **brain, not a transport**: it has no I/O. Bytes are
-moved by whatever you have — `node:net` for TCP gateways (YDWG, W2K-1,
-NavLink2, IPG100), serialport for NGT-1/iKonvert, an `AF_CAN` wrapper
-for socketcan (there is no pure-JS CAN socket; on hardware CAN buses
-the native `canboat interface` remains the batteries-included choice —
-address claiming, NAME responder, TX chunking).
+This package decodes and encodes. It does no I/O, so moving bytes is left to
+whatever you already have: `node:net` for TCP gateways (YDWG, W2K-1, NavLink2,
+IPG100), serialport for NGT-1 and iKonvert, or an `AF_CAN` wrapper for
+socketcan. There is no pure-JS CAN socket, and on hardware CAN buses the native
+`canboat interface` still does more for you, including address claiming, the
+NAME responder, and TX chunking.
 
 ## Building
 
@@ -77,9 +85,9 @@ npm run build      # wasm-pack build --release --target nodejs
 npm test           # pinned-vector smoke tests
 ```
 
-The crate depends on `canboat-core` and the `canboat` library
-(`json-input` feature) via a pinned git revision — see `Cargo.toml`.
+The crate depends on `canboat-core` and the `canboat` library (`json-input`
+feature) at a pinned git revision. See `Cargo.toml`.
 
 ## License
 
-Apache-2.0, © Kees Verruijt — same as canboat.
+Apache-2.0, © Kees Verruijt, same as canboat.
