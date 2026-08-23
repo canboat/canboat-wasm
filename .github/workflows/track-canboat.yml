@@ -8,9 +8,9 @@ name: track-canboat
 # cuts the Release, and publish.yml ships the npm package — so the npm
 # version always names the canboat brain it compiles.
 #
-# The full check runs here, before the PR is opened: a PR created with
-# the default GITHUB_TOKEN does not trigger CI workflows (set a
-# RELEASE_PLEASE_TOKEN PAT to get CI on these PRs too).
+# The full check runs here, before the PR is opened. The PR itself is
+# opened with a GitHub App token (RELEASE_APP_ID / RELEASE_APP_PRIVATE_KEY)
+# rather than the default GITHUB_TOKEN, which would not trigger CI on it.
 
 on:
   schedule:
@@ -31,9 +31,15 @@ jobs:
   track:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v7
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Determine target canboat release
         id: target
@@ -109,7 +115,7 @@ jobs:
       - name: Open the tracking PR
         if: steps.target.outputs.skip == 'false'
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG: ${{ steps.target.outputs.tag }}
           VERSION: ${{ steps.target.outputs.version }}
         run: |
