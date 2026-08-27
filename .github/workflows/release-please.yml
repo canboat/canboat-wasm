@@ -22,7 +22,7 @@ jobs:
     outputs:
       pr: ${{ steps.rp.outputs.pr }}
     steps:
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
@@ -49,7 +49,7 @@ jobs:
     if: ${{ needs.release-please.outputs.pr != '' && needs.release-please.outputs.pr != 'null' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
@@ -93,7 +93,7 @@ jobs:
     if: ${{ needs.release-please.outputs.pr != '' && needs.release-please.outputs.pr != 'null' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
