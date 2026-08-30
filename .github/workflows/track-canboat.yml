@@ -129,3 +129,16 @@ jobs:
           gh pr create \
             --title "feat: canboat $TAG" \
             --body "$(printf 'Moves the brain pin to [canboat %s](https://github.com/canboat/canboat/releases/tag/%s). Build, typecheck and both smoke suites passed against the new pin in the [tracking run](%s).\n\nMerging this makes release-please propose **chore: release %s**; merging that tags and publishes `@canboat/wasm@%s` to npm.\n\n⚠️ If squash-merging, keep the footer below in the squash commit message — it is what pins the release version.\n\nRelease-As: %s' "$TAG" "$TAG" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$VERSION" "$VERSION" "$VERSION")"
+
+          # Arm auto-merge on the PR just created, so a canboat release
+          # reaches npm without a human step. The release-please PR that
+          # follows arms its own auto-merge, completing the chain.
+          #
+          # Scoped to this branch alone -- only the tracking PR this step
+          # just pushed. Ordinary PRs (dependabot, features, fixes) are
+          # untouched and still merge by hand.
+          #
+          # Branch protection requires build-and-test, so GitHub holds the
+          # merge until CI is green. A merge commit, not squash, keeps the
+          # Release-As footer that pins the release version.
+          gh pr merge "track-canboat-$TAG" --merge --auto
