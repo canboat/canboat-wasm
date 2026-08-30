@@ -1,6 +1,6 @@
 {
   "name": "@canboat/wasm",
-  "version": "8.0.0",
+  "version": "8.1.0",
   "description": "WebAssembly build of the canboat NMEA 2000 decoder/encoder — the canboat wire brain as a pure-npm, in-process package.",
   "type": "module",
   "main": "./dist/index.cjs",
