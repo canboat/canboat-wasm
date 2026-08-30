@@ -22,7 +22,7 @@ jobs:
     outputs:
       pr: ${{ steps.rp.outputs.pr }}
     steps:
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
@@ -49,7 +49,7 @@ jobs:
     if: ${{ needs.release-please.outputs.pr != '' && needs.release-please.outputs.pr != 'null' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
@@ -73,3 +73,37 @@ jobs:
             git commit -am "chore: re-stamp Cargo.lock for release"
             git push
           fi
+
+  # Without this the chain stalls: release-please proposes the release PR
+  # and publish.yml is armed on the tag, but nothing merges the PR, so a
+  # release waits on someone noticing. 8.0.0 sat ready for two days that
+  # way. Auto-merge closes the gap while keeping CI as the gate — GitHub
+  # holds the merge until required checks pass and merges only then, so
+  # this is "merge when green", not "merge now". That guarantee comes from
+  # branch protection requiring the build-and-test check; without a
+  # required check auto-merge would land the PR immediately.
+  #
+  # Runs after regenerate so the re-stamped Cargo.lock is already on the
+  # branch; enabling auto-merge before that push would race it.
+  #
+  # Only ever touches release-please's own PRs. A merge commit (not
+  # squash) is what release-please expects to recognise its release.
+  auto-merge:
+    needs: [release-please, regenerate]
+    if: ${{ needs.release-please.outputs.pr != '' && needs.release-please.outputs.pr != 'null' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: enable auto-merge on the release PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR: ${{ fromJson(needs.release-please.outputs.pr).number }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --merge --auto
+          echo "auto-merge armed on #$PR; it lands when required checks pass"
