@@ -99,7 +99,7 @@ source = "git+https://github.com/canboat/canboat?tag=v8.1.0#4cc490f50d85aaaf4372
 
 [[package]]
 name = "canboat-wasm"
-version = "8.0.0"
+version = "8.1.0"
 dependencies = [
  "canboat",
  "canboat-core",
