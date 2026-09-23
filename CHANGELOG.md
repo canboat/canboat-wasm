@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.2.0](https://github.com/canboat/canboat-wasm/compare/v8.1.0...v8.2.0) (2026-09-23)
+
+
+### Added
+
+* canboat v8.2.0 ([58010f3](https://github.com/canboat/canboat-wasm/commit/58010f3220509720459bd831ef5e7f76832e4556))
+* canboat v8.2.0 ([cdc8f89](https://github.com/canboat/canboat-wasm/commit/cdc8f8990c05aab49f4646fe5296f5617af70192))
+
 ## [8.1.0](https://github.com/canboat/canboat-wasm/compare/v8.0.0...v8.1.0) (2026-08-30)
 
 
