@@ -104,6 +104,32 @@ assert.match(version(), /^\d+\.\d+\.\d+/);
   assert.strictEqual(buf.length, 8);
 }
 
+// compat shim: flat canboatjs objects (field values beside `pgn`, no
+// `fields`) — what signalk-to-nmea2000 emits — encode like canboatjs.
+{
+  const flat = {
+    pgn: 127508,
+    "Battery Instance": 0,
+    Instance: 0,
+    Voltage: 26.27,
+    Current: -63.9,
+    Temperature: 300.15,
+  };
+  assert.strictEqual(toPgn(flat).toString("hex"), "00430a81fd3f75ff");
+  const { TxEncoder, ByteDecoder } = await import("../dist/index.js");
+  assert.deepStrictEqual(
+    new TxEncoder(true).encode(JSON.stringify(flat), "n2k-ascii"),
+    ["A000000.000 FF6 1F214 00430A81FD3F75FF"],
+  );
+  const m = new ByteDecoder("maretron-ipg", true, true, true);
+  assert.ok(
+    Buffer.from(m.encodeFrame(JSON.stringify(flat), true))
+      .toString("hex")
+      .endsWith("00430a81fd3f75ff"),
+    "maretron tx carries the flat record's values",
+  );
+}
+
 // error path: raw API throws, shim reports via the 'error' event.
 {
   const d = new Decoder(true, true, true, false);

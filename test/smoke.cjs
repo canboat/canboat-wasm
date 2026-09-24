@@ -23,4 +23,11 @@ assert.strictEqual(
   "3004a059008297c0",
 );
 
+assert.strictEqual(
+  toPgn({ pgn: 127508, Instance: 0, Voltage: 26.27 }).toString("hex"),
+  toPgn({ pgn: 127508, fields: { instance: 0, voltage: 26.27 } }).toString(
+    "hex",
+  ),
+);
+
 console.log("smoke (cjs): all assertions passed");
