@@ -190,20 +190,23 @@ const ENVELOPE_KEYS: [&str; 6] = ["timestamp", "prio", "src", "dst", "pgn", "des
 /// `{"pgn":127508,"Instance":0,"Voltage":26.27}`. canboat's JSON input
 /// reads `fields` only, so a flat record would encode with every field
 /// unavailable. Fold the non-envelope keys into `fields` first; records
-/// that already carry `fields` (or a `-camel` envelope) pass untouched.
+/// that already carry a `fields` object (or a `-camel` envelope) pass
+/// untouched. A non-object `fields` (`null`) is ignored, as canboatjs'
+/// truthiness check does.
 fn canboatjs_to_analyzer(json: &str) -> Cow<'_, str> {
     let Ok(Value::Object(root)) = serde_json::from_str::<Value>(json) else {
         return Cow::Borrowed(json);
     };
-    if !root.contains_key("pgn")
-        || root.contains_key("fields")
-        || root.keys().all(|k| ENVELOPE_KEYS.contains(&k.as_str()))
-    {
+    if !root.contains_key("pgn") || root.get("fields").is_some_and(Value::is_object) {
         return Cow::Borrowed(json);
     }
     let (envelope, fields): (Map<String, Value>, Map<String, Value>) = root
         .into_iter()
+        .filter(|(k, _)| k != "fields")
         .partition(|(k, _)| ENVELOPE_KEYS.contains(&k.as_str()));
+    if fields.is_empty() {
+        return Cow::Borrowed(json);
+    }
     let mut record = envelope;
     record.insert("fields".to_string(), Value::Object(fields));
     Cow::Owned(Value::Object(record).to_string())
@@ -520,6 +523,11 @@ mod tests {
         )
         .expect("fields encodes");
         assert_eq!(flat.data, wrapped.data);
+        // `fields: null` survives JSON.stringify; canboatjs' truthiness
+        // check falls back to the flat keys, and so must we.
+        let null_fields = FLAT_127508.replacen('{', r#"{"fields":null,"#, 1);
+        let frame = frame_from_json_str(&null_fields, true).expect("null fields encodes");
+        assert_eq!(frame.data, flat.data);
     }
 
     #[test]
