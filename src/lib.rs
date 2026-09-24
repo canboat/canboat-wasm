@@ -12,10 +12,13 @@
 //! That keeps u64-width values exact and guarantees parity with
 //! `canboat convert` for free.
 
+use std::borrow::Cow;
+
 use canboat_core::output::json::{CamelCase, JsonOptions, write_json};
 use canboat_core::{
     FramePacketType, PacketType, PgnDatabase, RawFrame, Reassembled, Reassembler, Units, format,
 };
+use serde_json::{Map, Value};
 use wasm_bindgen::prelude::*;
 
 /// The canboat schema version compiled into this build.
@@ -177,8 +180,38 @@ impl Decoder {
     }
 }
 
+/// Record keys that are envelope, not field values, in a canboatjs
+/// object.
+const ENVELOPE_KEYS: [&str; 6] = ["timestamp", "prio", "src", "dst", "pgn", "description"];
+
+/// canboatjs' `toPgn` reads field values from `fields` when present and
+/// from the record itself otherwise, and TX producers (Signal K's
+/// signalk-to-nmea2000 et al.) emit that flat shape:
+/// `{"pgn":127508,"Instance":0,"Voltage":26.27}`. canboat's JSON input
+/// reads `fields` only, so a flat record would encode with every field
+/// unavailable. Fold the non-envelope keys into `fields` first; records
+/// that already carry `fields` (or a `-camel` envelope) pass untouched.
+fn canboatjs_to_analyzer(json: &str) -> Cow<'_, str> {
+    let Ok(Value::Object(root)) = serde_json::from_str::<Value>(json) else {
+        return Cow::Borrowed(json);
+    };
+    if !root.contains_key("pgn")
+        || root.contains_key("fields")
+        || root.keys().all(|k| ENVELOPE_KEYS.contains(&k.as_str()))
+    {
+        return Cow::Borrowed(json);
+    }
+    let (envelope, fields): (Map<String, Value>, Map<String, Value>) = root
+        .into_iter()
+        .partition(|(k, _)| ENVELOPE_KEYS.contains(&k.as_str()));
+    let mut record = envelope;
+    record.insert("fields".to_string(), Value::Object(fields));
+    Cow::Owned(Value::Object(record).to_string())
+}
+
 fn frame_from_json_str(json: &str, si: bool) -> Result<RawFrame, JsError> {
-    match canboat::json_input::frame_from_json(database(si, false), json.trim()) {
+    let json = canboatjs_to_analyzer(json.trim());
+    match canboat::json_input::frame_from_json(database(si, false), &json) {
         Ok(Some(frame)) => Ok(frame),
         Ok(None) => Err(JsError::new("record is synthetic (no wire form)")),
         Err(e) => Err(JsError::new(&format!("{e:#}"))),
@@ -468,5 +501,51 @@ mod tests {
             .expect("decodes")
             .expect("complete record");
         assert!(out.contains("\"ecu1\""), "got: {out}");
+    }
+
+    // signalk-to-nmea2000's battery status, flat as canboatjs accepts
+    // it; the bytes are canboatjs' toPgn output for the same object.
+    const FLAT_127508: &str = r#"{"pgn":127508,"Battery Instance":0,"Instance":0,"Voltage":26.27,"Current":-63.9,"Temperature":300.15}"#;
+
+    #[test]
+    fn flat_canboatjs_record_encodes_like_fields_record() {
+        let flat = frame_from_json_str(FLAT_127508, true).expect("flat encodes");
+        assert_eq!(
+            flat.data.to_vec(),
+            [0x00, 0x43, 0x0a, 0x81, 0xfd, 0x3f, 0x75, 0xff]
+        );
+        let wrapped = frame_from_json_str(
+            r#"{"pgn":127508,"fields":{"instance":0,"voltage":26.27,"current":-63.9,"temperature":300.15}}"#,
+            true,
+        )
+        .expect("fields encodes");
+        assert_eq!(flat.data, wrapped.data);
+    }
+
+    #[test]
+    fn flat_record_keeps_envelope() {
+        let frame = frame_from_json_str(
+            r#"{"pgn":127506,"prio":3,"dst":42,"DC Instance":0,"DC Type":"Battery","Instance":0,"State of Charge":71,"Time Remaining":null,"Ripple Voltage":null}"#,
+            true,
+        )
+        .expect("flat encodes");
+        assert_eq!(frame.prio, 3);
+        assert_eq!(frame.dst, 42);
+        // sid, instance, dc type, state of charge.
+        assert_eq!(frame.data[..4], [0xff, 0x00, 0x00, 0x47]);
+    }
+
+    #[test]
+    fn fields_and_camel_records_pass_through() {
+        for json in [
+            r#"{"pgn":127508,"fields":{"voltage":26.27}}"#,
+            r#"{"batteryStatus":{"pgn":127508,"fields":{"voltage":26.27}}}"#,
+            r#"{"pgn":127508}"#,
+        ] {
+            assert!(
+                matches!(canboatjs_to_analyzer(json), Cow::Borrowed(_)),
+                "{json}"
+            );
+        }
     }
 }
