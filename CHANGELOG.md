@@ -1,5 +1,14 @@
 # Changelog
 
+## [8.2.1](https://github.com/canboat/canboat-wasm/compare/v8.2.0...v8.2.1) (2026-09-24)
+
+
+### Fixed
+
+* accept flat canboatjs records in the encoders ([024fa08](https://github.com/canboat/canboat-wasm/commit/024fa08bddb0132c367d8e8ce5e4d777ecdb1270))
+* accept flat canboatjs records in the encoders ([40081e8](https://github.com/canboat/canboat-wasm/commit/40081e8309dfc56bf1e849f0e1b6d06d8bd81e20))
+* treat a null `fields` like canboatjs does ([069af08](https://github.com/canboat/canboat-wasm/commit/069af0821881509907bf157a8efc860461367dea))
+
 ## [8.2.0](https://github.com/canboat/canboat-wasm/compare/v8.1.0...v8.2.0) (2026-09-23)
 
 
