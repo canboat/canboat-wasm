@@ -71,7 +71,7 @@ dependencies = [
 
 [[package]]
 name = "canboat-wasm"
-version = "8.2.2"
+version = "8.3.0"
 dependencies = [
  "canboat",
  "serde_json",
