@@ -1,5 +1,12 @@
 # Changelog
 
+## [8.2.2](https://github.com/canboat/canboat-wasm/compare/v8.2.1...v8.2.2) (2026-09-25)
+
+
+### Changed
+
+* build on the single canboat crate's facade ([#21](https://github.com/canboat/canboat-wasm/issues/21)) ([b29355a](https://github.com/canboat/canboat-wasm/commit/b29355a58a64dfe9dd4bba9c4f6b4d46a9822ff3))
+
 ## [8.2.1](https://github.com/canboat/canboat-wasm/compare/v8.2.0...v8.2.1) (2026-09-24)
 
 
