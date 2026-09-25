@@ -302,10 +302,13 @@ impl TxEncoder {
                     *slot = (s + 1) & 0x07;
                     s
                 };
-                Ok(fastpacket::fragment(seq, &frame.data)
-                    .iter()
-                    .map(|chunk| write_one(&chunk[..]))
-                    .collect())
+                let frames = fastpacket::fragment(seq, &frame.data).ok_or_else(|| {
+                    JsError::new(&format!(
+                        "ydwg-raw: {} bytes exceed one fast-packet message",
+                        frame.data.len()
+                    ))
+                })?;
+                Ok(frames.iter().map(|chunk| write_one(&chunk[..])).collect())
             }
             other => Err(JsError::new(&format!(
                 "unknown TX format '{other}' (plain | n2k-ascii | ydwg-raw)"
