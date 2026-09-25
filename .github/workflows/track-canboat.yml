@@ -1,7 +1,7 @@
 name: track-canboat
 
 # Follows canboat releases (including alphas/betas). When canboat cuts
-# vX.Y.Z, this opens a PR that moves the Cargo pin to that tag, with a
+# vX.Y.Z, this opens a PR that moves the `canboat` crate pin to X.Y.Z, with a
 # `Release-As: X.Y.Z` footer — canboat's own convention for steering
 # release-please (see canboat#782/#817). Merging the PR makes
 # release-please propose "chore: release X.Y.Z"; merging *that* tags,
@@ -12,9 +12,12 @@ name: track-canboat
 # opened with a GitHub App token (RELEASE_APP_ID / RELEASE_APP_PRIVATE_KEY)
 # rather than the default GITHUB_TOKEN, which would not trigger CI on it.
 
+# canboat's release workflow sends the `canboat-release` dispatch once the
+# crate is on crates.io, so a release is tracked within minutes. The daily
+# schedule is only a fallback for a missed dispatch.
 on:
   schedule:
-    - cron: "35 */3 * * *"
+    - cron: "35 4 * * *"
   workflow_dispatch:
     inputs:
       tag:
@@ -59,7 +62,9 @@ jobs:
             v[0-9]*.[0-9]*.[0-9]*) ;;
             *) echo "::error::'$TAG' is not a vX.Y.Z tag"; exit 1 ;;
           esac
-          CURRENT=$(grep -oEm1 '(tag|rev) = "[^"]+"' Cargo.toml | cut -d'"' -f2)
+          # The pin is the exact crates.io version of the `canboat` crate;
+          # as a tag name it is vX.Y.Z.
+          CURRENT="v$(sed -nE 's/^canboat *= *\{ *version = "=?([^"]+)".*/\1/p' Cargo.toml)"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
           if [ "$CURRENT" = "$TAG" ]; then
@@ -92,9 +97,21 @@ jobs:
         if: steps.target.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          sed -i -E 's%(git = "https://github\.com/canboat/canboat", )(tag|rev) = "[^"]+"%\1tag = "${{ steps.target.outputs.tag }}"%' Cargo.toml
-          grep -c 'tag = "${{ steps.target.outputs.tag }}"' Cargo.toml | grep -qx 3
-          cargo update -p canboat -p canboat-core -p canboat-io -p canboat-schema
+          VERSION="${{ steps.target.outputs.version }}"
+          # The dispatch comes after the crate is published, but a
+          # scheduled run can land between canboat's tag and its crates.io
+          # publish: wait for the crate (up to 30 min) rather than fail.
+          for _ in $(seq 1 30); do
+            if curl -sSf -A "canboat-wasm track-canboat (github.com/canboat/canboat-wasm)" \
+                 "https://crates.io/api/v1/crates/canboat/$VERSION" -o /dev/null; then
+              break
+            fi
+            echo "canboat $VERSION is not on crates.io yet; waiting"
+            sleep 60
+          done
+          sed -i -E "s%^(canboat *= *\{ *version = \")=?[^\"]+\"%\1=$VERSION\"%" Cargo.toml
+          grep -qE "^canboat *= *\{ *version = \"=$VERSION\"" Cargo.toml
+          cargo update -p canboat
 
       - name: Install Rust with wasm target
         if: steps.target.outputs.skip == 'false'
