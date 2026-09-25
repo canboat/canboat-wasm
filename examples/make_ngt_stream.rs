@@ -29,6 +29,10 @@ fn main() {
         if frame.pgn >= 0x40000 {
             continue;
         }
-        out.write_all(&encode_received(&frame, 0)).expect("write");
+        // More data than one NGT-1 message carries (> 244 bytes).
+        let Some(bytes) = encode_received(&frame, 0) else {
+            continue;
+        };
+        out.write_all(&bytes).expect("write");
     }
 }
