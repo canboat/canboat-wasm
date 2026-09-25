@@ -427,10 +427,12 @@ impl ByteDecoder {
 
     /// Bytes to write as soon as the connection opens: the NGT-1 startup
     /// ping, the iKonvert `N2NET_OFFLINE` that starts its init handshake,
-    /// or the Maretron CONNECT (with `password`). Starts a fresh session.
+    /// or the Maretron CONNECT (with `password`). Starts a fresh session:
+    /// bytes the previous one queued for [`takePendingTx`] are dropped.
     #[wasm_bindgen(js_name = initBytes)]
     pub fn init_bytes(&mut self, password: &str) -> Vec<u8> {
         self.codec = self.kind.codec(password);
+        self.pending_tx.clear();
         self.codec.open()
     }
 

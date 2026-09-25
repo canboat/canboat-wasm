@@ -232,4 +232,11 @@ console.log("smoke (esm): all assertions passed");
   assert.strictEqual(text(k.closeBytes()), "$PDGY,N2NET_OFFLINE\r\n");
   assert.strictEqual(k.keepaliveBytes(), undefined);
   assert.deepStrictEqual(k.takeErrors(), []);
+
+  // A new session does not inherit the old one's queued handshake bytes.
+  const r = new ByteDecoder("maretron-ipg", true, true, true);
+  r.initBytes("pw");
+  r.decodeBytes(Buffer.from("CONNECTED\t1234567\0"));
+  r.initBytes("pw");
+  assert.strictEqual(r.takePendingTx().length, 0, "stale SET_MODE dropped");
 }
