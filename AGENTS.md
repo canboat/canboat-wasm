@@ -6,9 +6,10 @@ Conventions for agents (and humans) working on this repository.
 
 The [canboat](https://github.com/canboat/canboat) NMEA 2000
 decoder/encoder compiled to WebAssembly and wrapped for npm. **This repo
-contains no protocol logic of its own** — the wire brain is the canboat
-Rust workspace, consumed as a git dependency pinned by revision in
-`Cargo.toml`. One codebase, two build targets: anything about PGN
+contains no protocol logic of its own** — the wire brain is canboat's
+`canboat` crate, consumed from crates.io with only its sans-I/O features
+(`decode`, `json-input`) and pinned to an exact version in `Cargo.toml`.
+The gateway protocols come from its public `canboat::codec` module. One codebase, two build targets: anything about PGN
 decoding/encoding belongs upstream in canboat (usually in its
 `database/` YAML), never here.
 
@@ -38,7 +39,8 @@ decoding/encoding belongs upstream in canboat (usually in its
   a CJS runtime module loaded externally — never bundle it.
 - **The Cargo pin is deliberate — and normally machine-moved.** The
   `track-canboat` workflow follows canboat releases (alphas and betas
-  included) and opens a PR moving the pin to the release tag, carrying
+  included; canboat's release workflow dispatches it once the crate is on
+  crates.io) and opens a PR moving the pin to that version, carrying
   a `Release-As:` footer so release-please releases this package under
   the **same version as the canboat brain it compiles**. Manual pin
   bumps are for emergencies only; say why in the commit message.

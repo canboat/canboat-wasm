@@ -7,8 +7,8 @@
 
 use std::io::Write;
 
-use canboat_core::format::ngt1::{N2K_MSG_RECEIVED, encode_ngt_message};
-use canboat_core::format::plain;
+use canboat::codec::line::{self, InputFormat};
+use canboat::codec::ngt1::encode_received;
 
 fn main() {
     let path = std::env::args()
@@ -17,30 +17,22 @@ fn main() {
     let text = std::fs::read_to_string(path).expect("read capture");
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
-    let mut buf = Vec::with_capacity(512);
-    for line in text.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
+    for text_line in text.lines() {
+        let text_line = text_line.trim();
+        if text_line.is_empty() || text_line.starts_with('#') {
             continue;
         }
-        let Ok(frame) = plain::parse_line(line) else {
+        let Ok(Some(frame)) = line::parse(InputFormat::Plain, text_line) else {
             continue;
         };
         // Synthetic canboat-internal PGNs never appear on a real wire.
         if frame.pgn >= 0x40000 {
             continue;
         }
-        // 0x93 payload: prio, pgn (3 LE), dst, src, ts (4 LE), len, data.
-        let mut payload = Vec::with_capacity(11 + frame.data.len());
-        payload.push(frame.prio);
-        payload.extend_from_slice(&frame.pgn.to_le_bytes()[..3]);
-        payload.push(frame.dst);
-        payload.push(frame.src);
-        payload.extend_from_slice(&0u32.to_le_bytes());
-        payload.push(frame.data.len() as u8);
-        payload.extend_from_slice(&frame.data);
-        buf.clear();
-        encode_ngt_message(N2K_MSG_RECEIVED, &payload, &mut buf);
-        out.write_all(&buf).expect("write");
+        // More data than one NGT-1 message carries (> 244 bytes).
+        let Some(bytes) = encode_received(&frame, 0) else {
+            continue;
+        };
+        out.write_all(&bytes).expect("write");
     }
 }

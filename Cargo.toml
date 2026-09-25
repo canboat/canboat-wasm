@@ -11,16 +11,12 @@ description = "WebAssembly bindings for the canboat NMEA 2000 decoder/encoder."
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# The wire brain comes from the canboat repo itself — one codebase,
-# compiled here for wasm32, pinned to an upstream revision. Bumping the
-# pin changes the compiled brain: it happens via the track-canboat
-# workflow, which follows canboat releases and moves the pin to the
-# release tag (current pin: master at the canboat#820 merge — the
-# J1939 schema flavor; ahead of the newest release by design, the
-# tracker's never-downgrade guard skips until a newer release exists).
-canboat-core = { git = "https://github.com/canboat/canboat", tag = "v8.2.0" }
-canboat      = { git = "https://github.com/canboat/canboat", tag = "v8.2.0", default-features = false, features = ["json-input"] }
-canboat-io   = { git = "https://github.com/canboat/canboat", tag = "v8.2.0" }
+# The wire brain comes from canboat itself — one codebase, compiled here
+# for wasm32 — as the `canboat` crate on crates.io, with only its sans-I/O
+# features. Pinned exactly: the npm version names the canboat release it
+# compiles. Bumping the pin changes the compiled brain; it happens via the
+# track-canboat workflow, which follows canboat releases.
+canboat      = { version = "=8.3.0", default-features = false, features = ["decode", "json-input"] }
 # Already in the tree via canboat's json-input; used to fold flat
 # canboatjs records into `fields` before encoding.
 serde_json   = "1"

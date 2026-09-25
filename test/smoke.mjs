@@ -214,4 +214,29 @@ console.log("smoke (esm): all assertions passed");
     "maretron tx frame",
   );
   assert.throws(() => new ByteDecoder("nope", true, true, true));
+
+  // iKonvert: the init handshake advances on each device answer, frames
+  // decode, and closing takes the gateway off the bus.
+  const text = (bytes) => Buffer.from(bytes).toString("latin1");
+  const k = new ByteDecoder("ikonvert", true, true, true);
+  assert.strictEqual(text(k.initBytes("")), "$PDGY,N2NET_OFFLINE\r\n");
+  k.decodeBytes(Buffer.from("$PDGY,TEXT,Digital_Yacht_iKonvert\r\n"));
+  assert.strictEqual(text(k.takePendingTx()), "$PDGY,N2NET_RESET\r\n");
+  k.decodeBytes(Buffer.from("$PDGY,ACK,N2NET_RESET\r\n"));
+  assert.strictEqual(text(k.takePendingTx()), "$PDGY,N2NET_INIT,ALL\r\n");
+  const [wind] = k.decodeBytes(
+    Buffer.from("!PDGY,130306,2,35,255,12.345,/xAB6AP6//8=\r\n"),
+  );
+  assert.strictEqual(JSON.parse(wind).windData.src, 35, "ikonvert frame");
+  assert.deepStrictEqual(k.tick(), []);
+  assert.strictEqual(text(k.closeBytes()), "$PDGY,N2NET_OFFLINE\r\n");
+  assert.strictEqual(k.keepaliveBytes(), undefined);
+  assert.deepStrictEqual(k.takeErrors(), []);
+
+  // A new session does not inherit the old one's queued handshake bytes.
+  const r = new ByteDecoder("maretron-ipg", true, true, true);
+  r.initBytes("pw");
+  r.decodeBytes(Buffer.from("CONNECTED\t1234567\0"));
+  r.initBytes("pw");
+  assert.strictEqual(r.takePendingTx().length, 0, "stale SET_MODE dropped");
 }

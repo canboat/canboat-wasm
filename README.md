@@ -78,6 +78,14 @@ socketcan. There is no pure-JS CAN socket, and on hardware CAN buses the native
 `canboat interface` still does more for you, including address claiming, the
 NAME responder, and TX chunking.
 
+For the byte-stream gateways, `ByteDecoder` (`"ngt1"`, `"ikonvert"`,
+`"maretron-ipg"`) handles the protocol over whatever carries the bytes:
+feed it what arrives with `decodeBytes`, write out `initBytes`,
+`takePendingTx` (the next handshake step), `encodeFrame` and `closeBytes`,
+and call `tick` about once a second so its timers advance on a quiet link.
+The protocol code is canboat's own (`canboat::codec`), the same code the
+native `canboat interface` runs.
+
 ## Building
 
 ```sh
@@ -85,8 +93,8 @@ npm run build      # wasm-pack build --release --target nodejs
 npm test           # pinned-vector smoke tests
 ```
 
-The crate depends on `canboat-core` and the `canboat` library (`json-input`
-feature) at a pinned git revision. See `Cargo.toml`.
+The crate depends on the `canboat` library (`decode` and `json-input`
+features, no I/O) at a pinned release. See `Cargo.toml`.
 
 ## License
 
