@@ -14,25 +14,26 @@
 
 use std::borrow::Cow;
 
-use canboat_core::output::json::{CamelCase, JsonOptions, write_json};
-use canboat_core::{
-    FramePacketType, PacketType, PgnDatabase, RawFrame, Reassembled, Reassembler, Units, format,
-};
+use canboat::codec::line::{self, InputFormat};
+use canboat::codec::{self, Codec, Event};
+use canboat::output::{CamelCase, JsonOptions, write_json};
+use canboat::schema::PacketType;
+use canboat::{Database, Frame, FramePacketType, Reassembled, Reassembler, Units};
 use serde_json::{Map, Value};
 use wasm_bindgen::prelude::*;
 
 /// The canboat schema version compiled into this build.
 #[wasm_bindgen]
 pub fn version() -> String {
-    canboat_core::CANBOAT_JSON_VERSION.to_string()
+    canboat::CANBOAT_VERSION.to_string()
 }
 
-fn database(si: bool, j1939: bool) -> &'static PgnDatabase {
+fn database(si: bool, j1939: bool) -> &'static Database {
     let units = if si { Units::Si } else { Units::Metric };
     if j1939 {
-        PgnDatabase::embedded_j1939(units)
+        Database::embedded_j1939(units)
     } else {
-        PgnDatabase::embedded(units)
+        Database::embedded(units)
     }
 }
 
@@ -42,7 +43,7 @@ fn database(si: bool, j1939: bool) -> &'static PgnDatabase {
 /// exactly like canboatjs' `FromPgn`.
 #[wasm_bindgen]
 pub struct Decoder {
-    db: &'static PgnDatabase,
+    db: &'static Database,
     reasm: Reassembler,
     opts: JsonOptions,
     /// Every line is an already-coalesced record (`# format=FAST`
@@ -51,8 +52,8 @@ pub struct Decoder {
     /// from a wire fragment.
     coalesced: bool,
     /// Line format, sniffed from the first parseable line and then
-    /// sticky — mirrors canboat-io's LineFrameReader.
-    active: Option<format::InputFormat>,
+    /// sticky — mirrors canboat's `read::PlainReader`.
+    active: Option<InputFormat>,
 }
 
 #[wasm_bindgen]
@@ -114,16 +115,16 @@ impl Decoder {
             return Ok(None);
         }
         // Sniff the line format once and stick with it, exactly like
-        // canboat-io's LineFrameReader (plain when nothing matches).
+        // canboat's `read::PlainReader` (plain when nothing matches).
         let fmt = match self.active {
             Some(f) => f,
             None => {
-                let f = format::detect(line).unwrap_or(format::InputFormat::Plain);
+                let f = line::detect(line).unwrap_or(InputFormat::Plain);
                 self.active = Some(f);
                 f
             }
         };
-        let frame = match format::parse_with(fmt, line) {
+        let frame = match line::parse(fmt, line) {
             Ok(Some(f)) => f,
             // Control sentences / headers of the active format.
             Ok(None) => return Ok(None),
@@ -138,10 +139,8 @@ impl Decoder {
         // pass `coalesced` when the stream is known to be complete
         // records, as the native converter assumes.)
         let complete = match fmt {
-            format::InputFormat::Ydwg02
-            | format::InputFormat::Airmar
-            | format::InputFormat::Candump => false,
-            format::InputFormat::Plain | format::InputFormat::PlainMixFast => {
+            InputFormat::Ydwg02 | InputFormat::Airmar | InputFormat::Candump => false,
+            InputFormat::Plain | InputFormat::PlainMixFast => {
                 self.coalesced || frame.data.len() != 8
             }
             // Actisense ASCII, iKonvert, Chetco, Garmin CSV all carry
@@ -212,7 +211,7 @@ fn canboatjs_to_analyzer(json: &str) -> Cow<'_, str> {
     Cow::Owned(Value::Object(record).to_string())
 }
 
-fn frame_from_json_str(json: &str, si: bool) -> Result<RawFrame, JsError> {
+fn frame_from_json_str(json: &str, si: bool) -> Result<Frame, JsError> {
     let json = canboatjs_to_analyzer(json.trim());
     match canboat::json_input::frame_from_json(database(si, false), &json) {
         Ok(Some(frame)) => Ok(frame),
@@ -228,8 +227,7 @@ fn frame_from_json_str(json: &str, si: bool) -> Result<RawFrame, JsError> {
 pub fn encode_to_plain(json: &str, si: bool) -> Result<String, JsError> {
     let frame = frame_from_json_str(json, si)?;
     let mut out = String::with_capacity(64);
-    format::plain::write_line(&mut out, &frame)
-        .map_err(|e| JsError::new(&format!("format: {e}")))?;
+    line::write_plain(&mut out, &frame).map_err(|e| JsError::new(&format!("format: {e}")))?;
     Ok(out)
 }
 
@@ -271,22 +269,22 @@ impl TxEncoder {
         let mut line = String::with_capacity(64);
         match format_name {
             "plain" => {
-                format::plain::write_line(&mut line, &frame)
+                line::write_plain(&mut line, &frame)
                     .map_err(|e| JsError::new(&format!("format: {e}")))?;
                 Ok(vec![line])
             }
             "n2k-ascii" => {
-                format::actisense_ascii::write_line(&mut line, &frame)
+                line::write_actisense_ascii(&mut line, &frame)
                     .map_err(|e| JsError::new(&format!("format: {e}")))?;
                 Ok(vec![line])
             }
             "ydwg-raw" => {
-                use canboat_io::fastpacket;
+                use codec::fastpacket;
                 use std::fmt::Write as _;
                 // The device's transmit shape is a bare `<CANID> <bytes…>`
                 // line — no timestamp, no direction marker — exactly what
                 // the native line_gateway encoder writes.
-                let canid = format::iso11783_compose(frame.prio, frame.pgn, frame.src, frame.dst);
+                let canid = codec::can_id::compose(frame.prio, frame.pgn, frame.src, frame.dst);
                 let write_one = |data: &[u8]| {
                     let mut l = String::with_capacity(40);
                     let _ = write!(l, "{canid:08X}");
@@ -316,32 +314,80 @@ impl TxEncoder {
     }
 }
 
-/// Streaming byte decoder for the binary gateway framings: Actisense
-/// BEM (`kind: "ngt1"` — NGT-1 serial and W2K-1 Actisense mode share
-/// it) and the Maretron IPG100/200 session protocol
-/// (`kind: "maretron-ipg"`, including the text-mode handshake). The JS
-/// host owns the socket; this owns every byte in between.
+/// The host clock in Unix milliseconds: `Date.now()` in the browser or
+/// Node, the system clock in a native build (the unit tests).
+#[cfg(target_arch = "wasm32")]
+fn now_ms() -> u64 {
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen(js_namespace = Date, js_name = now)]
+        fn date_now() -> f64;
+    }
+    date_now() as u64
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Streaming byte decoder for the gateway protocols: Actisense BEM
+/// (`kind: "ngt1"` — NGT-1 serial and W2K-1 Actisense mode share it), the
+/// Digital Yacht iKonvert (`"ikonvert"`) and the Maretron IPG100/200
+/// session protocol (`"maretron-ipg"`). The JS host owns the port or
+/// socket; canboat's sans-I/O gateway codec (`canboat::codec`) owns every
+/// byte in between, including the init handshakes.
 ///
-/// Wasm has no clock, so frames keep the device timestamp (ngt1) or an
-/// epoch placeholder (maretron) — the consuming stream element stamps
-/// receive time.
+/// Frames carry the NGT-1's own timestamp, or the receive time for the
+/// iKonvert and Maretron, as the native `canboat interface` does. Like
+/// it, the NGT-1 and iKonvert codecs also emit the synthetic `NMEA 2000
+/// gateway: network status` record (PGN 262400).
 #[wasm_bindgen]
 pub struct ByteDecoder {
     kind: ByteKind,
-    db: &'static PgnDatabase,
+    codec: Box<dyn Codec>,
+    db: &'static Database,
     opts: JsonOptions,
     pending_tx: Vec<u8>,
     errors: Vec<String>,
 }
 
+#[derive(Clone, Copy)]
 enum ByteKind {
-    Ngt(canboat_core::format::ngt1::Ngt1Decoder),
-    Maretron(canboat_io::device::maretron::Decoder),
+    Ngt1,
+    Ikonvert,
+    Maretron,
+}
+
+impl ByteKind {
+    fn name(self) -> &'static str {
+        match self {
+            ByteKind::Ngt1 => "ngt1",
+            ByteKind::Ikonvert => "ikonvert",
+            ByteKind::Maretron => "maretron-ipg",
+        }
+    }
+
+    fn codec(self, password: &str) -> Box<dyn Codec> {
+        match self {
+            ByteKind::Ngt1 => Box::new(codec::ngt1::Ngt1::new(Default::default())),
+            ByteKind::Ikonvert => Box::new(codec::ikonvert::Ikonvert::new(Default::default())),
+            ByteKind::Maretron => {
+                Box::new(codec::maretron::Maretron::new(codec::maretron::Config {
+                    password: password.to_string(),
+                }))
+            }
+        }
+    }
 }
 
 #[wasm_bindgen]
 impl ByteDecoder {
-    /// `kind`: `"ngt1"` | `"maretron-ipg"`. Flags as on [`Decoder`].
+    /// `kind`: `"ngt1"` | `"ikonvert"` | `"maretron-ipg"`. Flags as on
+    /// [`Decoder`].
     #[wasm_bindgen(constructor)]
     pub fn new(
         kind: &str,
@@ -350,20 +396,18 @@ impl ByteDecoder {
         si: bool,
     ) -> Result<ByteDecoder, JsError> {
         let kind = match kind {
-            "ngt1" => ByteKind::Ngt(canboat_core::format::ngt1::Ngt1Decoder::new()),
-            // Fixed epoch timestamp: the io decoder stamps frames with
-            // the host clock otherwise, which panics on wasm.
-            "maretron-ipg" => ByteKind::Maretron(canboat_io::device::maretron::Decoder::new(Some(
-                "1970-01-01T00:00:00.000Z".to_string(),
-            ))),
+            "ngt1" => ByteKind::Ngt1,
+            "ikonvert" => ByteKind::Ikonvert,
+            "maretron-ipg" => ByteKind::Maretron,
             other => {
                 return Err(JsError::new(&format!(
-                    "unknown byte kind '{other}' (ngt1 | maretron-ipg)"
+                    "unknown byte kind '{other}' (ngt1 | ikonvert | maretron-ipg)"
                 )));
             }
         };
         Ok(ByteDecoder {
             kind,
+            codec: kind.codec(""),
             db: database(si, false),
             opts: JsonOptions {
                 name_value,
@@ -381,74 +425,47 @@ impl ByteDecoder {
         })
     }
 
-    /// Bytes to write as soon as the connection opens: the NGT-1
-    /// startup ping, or the Maretron CONNECT (with `password`).
+    /// Bytes to write as soon as the connection opens: the NGT-1 startup
+    /// ping, the iKonvert `N2NET_OFFLINE` that starts its init handshake,
+    /// or the Maretron CONNECT (with `password`). Starts a fresh session.
     #[wasm_bindgen(js_name = initBytes)]
-    pub fn init_bytes(&self, password: &str) -> Vec<u8> {
-        match &self.kind {
-            ByteKind::Ngt(_) => canboat_core::format::ngt1::encode_startup_ping(),
-            ByteKind::Maretron(_) => canboat_core::format::maretron_ipg::build_connect(password),
-        }
+    pub fn init_bytes(&mut self, password: &str) -> Vec<u8> {
+        self.codec = self.kind.codec(password);
+        self.codec.open()
     }
 
-    /// Periodic keepalive payload and its interval in seconds, or
-    /// `undefined` when the device needs none.
+    /// Periodic keepalive payload, or `undefined` when the device needs
+    /// none. The NGT-1 wants it every 20 s while the link is quiet.
     #[wasm_bindgen(js_name = keepaliveBytes)]
     pub fn keepalive_bytes(&self) -> Option<Vec<u8>> {
-        match &self.kind {
-            ByteKind::Ngt(_) => Some(canboat_core::format::ngt1::encode_startup_ping()),
-            ByteKind::Maretron(_) => None,
-        }
+        self.codec.keepalive().map(|(_, bytes)| bytes)
     }
 
     /// Feed received bytes; returns the analyzer-shaped JSON records
-    /// completed by them. Session responses the device expects (the
-    /// Maretron SET_MODE BINARY) accumulate for [`takePendingTx`];
-    /// framing errors for [`takeErrors`].
+    /// completed by them. Bytes the session needs written back (the
+    /// iKonvert init steps, the Maretron SET_MODE BINARY) accumulate for
+    /// [`takePendingTx`]; framing errors for [`takeErrors`].
     #[wasm_bindgen(js_name = decodeBytes)]
     pub fn decode_bytes(&mut self, bytes: &[u8]) -> Vec<String> {
-        let mut frames: Vec<RawFrame> = Vec::new();
-        match &mut self.kind {
-            ByteKind::Ngt(dec) => {
-                for ev in dec.push_bytes(bytes) {
-                    use canboat_core::format::ngt1::NgtEvent;
-                    match ev {
-                        NgtEvent::Message(msg) => {
-                            if let Some(f) = msg.to_raw_frame() {
-                                frames.push(f);
-                            }
-                        }
-                        NgtEvent::Error(e) => self.errors.push(e.to_string()),
-                        _ => {}
-                    }
-                }
-            }
-            ByteKind::Maretron(dec) => {
-                use canboat_io::device::{DeviceDecoder as _, DeviceEvent};
-                let mut events = Vec::new();
-                dec.decode(bytes, &mut events);
-                for ev in events {
-                    match ev {
-                        DeviceEvent::Frame(f) => frames.push(f),
-                        DeviceEvent::SendBytes(b) => self.pending_tx.extend_from_slice(&b),
-                        DeviceEvent::Error(e) => self.errors.push(e),
-                    }
-                }
-            }
-        }
-        let mut out = Vec::with_capacity(frames.len());
-        for frame in frames {
-            match self.db.decode(&frame) {
-                Ok(decoded) => {
-                    let mut s = String::with_capacity(256);
-                    if write_json(&mut s, &decoded, &self.opts).is_ok() {
-                        out.push(s);
-                    }
-                }
-                Err(e) => self.errors.push(format!("decode pgn {}: {e}", frame.pgn)),
-            }
-        }
-        out
+        let mut events = Vec::new();
+        self.codec.receive(bytes, now_ms(), &mut events);
+        self.handle(events)
+    }
+
+    /// Advance the codec's timers with nothing received — call it every
+    /// second or so on a quiet link. Returns records it produced (the NGT-1
+    /// network status), like [`decodeBytes`].
+    pub fn tick(&mut self) -> Vec<String> {
+        let mut events = Vec::new();
+        self.codec.tick(now_ms(), &mut events);
+        self.handle(events)
+    }
+
+    /// Bytes to write when closing the link on purpose: the iKonvert goes
+    /// off the bus. Empty for the others.
+    #[wasm_bindgen(js_name = closeBytes)]
+    pub fn close_bytes(&mut self) -> Vec<u8> {
+        self.codec.close()
     }
 
     /// Drain the bytes the session needs written to the device.
@@ -465,18 +482,34 @@ impl ByteDecoder {
 
     /// Encode one JSON record to the device's transmit bytes.
     #[wasm_bindgen(js_name = encodeFrame)]
-    pub fn encode_frame(&self, json: &str, si: bool) -> Result<Vec<u8>, JsError> {
+    pub fn encode_frame(&mut self, json: &str, si: bool) -> Result<Vec<u8>, JsError> {
         let frame = frame_from_json_str(json, si)?;
-        match &self.kind {
-            ByteKind::Ngt(_) => Ok(canboat_core::format::ngt1::encode_n2k_send_frame(&frame)),
-            ByteKind::Maretron(_) => canboat_core::format::maretron_ipg::build_frame(
-                frame.pgn,
-                frame.prio,
-                frame.dst,
-                &frame.data,
-            )
-            .ok_or_else(|| JsError::new("maretron: payload too large")),
+        self.codec
+            .send(&frame)
+            .map_err(|refused| JsError::new(&format!("{}: {refused}", self.kind.name())))
+    }
+}
+
+impl ByteDecoder {
+    /// Decode the frames among `events` to JSON; queue the rest.
+    fn handle(&mut self, events: Vec<Event>) -> Vec<String> {
+        let mut out = Vec::new();
+        for ev in events {
+            match ev {
+                Event::Frame(frame) => match self.db.decode(&frame) {
+                    Ok(decoded) => {
+                        let mut s = String::with_capacity(256);
+                        if write_json(&mut s, &decoded, &self.opts).is_ok() {
+                            out.push(s);
+                        }
+                    }
+                    Err(e) => self.errors.push(format!("decode pgn {}: {e}", frame.pgn)),
+                },
+                Event::Send(bytes) => self.pending_tx.extend_from_slice(&bytes),
+                Event::Error(e) => self.errors.push(e),
+            }
         }
+        out
     }
 }
 

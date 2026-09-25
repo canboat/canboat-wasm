@@ -12,15 +12,14 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # The wire brain comes from the canboat repo itself — one codebase,
-# compiled here for wasm32, pinned to an upstream revision. Bumping the
-# pin changes the compiled brain: it happens via the track-canboat
-# workflow, which follows canboat releases and moves the pin to the
-# release tag (current pin: master at the canboat#820 merge — the
-# J1939 schema flavor; ahead of the newest release by design, the
-# tracker's never-downgrade guard skips until a newer release exists).
-canboat-core = { git = "https://github.com/canboat/canboat", tag = "v8.2.0" }
-canboat      = { git = "https://github.com/canboat/canboat", tag = "v8.2.0", default-features = false, features = ["json-input"] }
-canboat-io   = { git = "https://github.com/canboat/canboat", tag = "v8.2.0" }
+# compiled here for wasm32. Normally pinned to a canboat release tag and
+# moved by the track-canboat workflow.
+#
+# TEMPORARY: a path dependency on a sibling canboat checkout, for porting
+# onto the single `canboat` crate's facade (canboat#921, canboat#925) before
+# that is released. CI cannot build this; switch back to a release pin
+# (`version = "8.x"` from crates.io) before merging.
+canboat      = { path = "../canboat/crates/canboat", default-features = false, features = ["decode", "json-input"] }
 # Already in the tree via canboat's json-input; used to fold flat
 # canboatjs records into `fields` before encoding.
 serde_json   = "1"
