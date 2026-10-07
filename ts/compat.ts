@@ -3,7 +3,7 @@
 // toPgn, pgnToActisenseSerialFormat — backed by the same Rust wire brain
 // as the native `canboat` binary. Scope: plain/Actisense-serial, YDWG
 // RAW, iKonvert and Actisense-ASCII input lines (format sniffed, like
-// the native reader).
+// the native reader), plus raw CAN frames for socketcan hosts.
 import { EventEmitter } from "node:events";
 import { Decoder, encodeData, encodeToPlain } from "../pkg/canboat_wasm.js";
 import { unwrapAnalyzerOutput } from "./vendor/analyzerOutput.js";
@@ -54,6 +54,31 @@ export class FromPgn extends EventEmitter {
       this.emit("error", line, err);
       return undefined;
     }
+    return this.emitRecord(out);
+  }
+
+  /** Decode one CAN frame given as its header and payload bytes, as a
+   * socketcan host reads it off the bus — no text rendering of the
+   * payload on either side. Frames go through fast-packet / ISO-TP
+   * reassembly, so feed them in bus order. */
+  parseFrame(
+    prio: number,
+    pgn: number,
+    src: number,
+    dst: number,
+    data: Uint8Array,
+  ): PgnObject | undefined {
+    let out: string | undefined;
+    try {
+      out = this.decoder.decodeFrame(prio, pgn, src, dst, data);
+    } catch (err) {
+      this.emit("error", { prio, pgn, src, dst, data }, err);
+      return undefined;
+    }
+    return this.emitRecord(out);
+  }
+
+  private emitRecord(out: string | undefined): PgnObject | undefined {
     if (out === undefined) {
       return undefined; // fast-packet still assembling
     }

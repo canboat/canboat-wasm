@@ -38,6 +38,34 @@ assert.match(version(), /^\d+\.\d+\.\d+/);
   assert.ok(JSON.parse(out).productInformation, "126996 decodes as one record");
 }
 
+// decodeFrame: a CAN frame as header + bytes decodes like its line.
+{
+  const line = new Decoder(true, true, true, false).decodeLine(
+    ",7,65359,204,255,8,3b,9f,ff,ff,ff,18,60,ff",
+  );
+  const frame = new Decoder(true, true, true, false).decodeFrame(
+    7,
+    65359,
+    204,
+    255,
+    Uint8Array.from([0x3b, 0x9f, 0xff, 0xff, 0xff, 0x18, 0x60, 0xff]),
+  );
+  assert.strictEqual(frame, line);
+}
+
+// FromPgn.parseFrame: canboatjs-shaped object from a Buffer payload.
+{
+  const pgn = new FromPgn().parseFrame(
+    6,
+    60928,
+    44,
+    172,
+    Buffer.from("3004a059008297c0", "hex"),
+  );
+  assert.strictEqual(pgn.fields.manufacturerCode, "Yacht Devices");
+  assert.strictEqual(pgn.src, 44);
+}
+
 // encode: group-function Command for a multi-variant proprietary
 // target — parameter 5 must use the Furuno variant's 16-bit/0.01
 // layout (canboat's encode-side variant matching).

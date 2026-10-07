@@ -23,6 +23,15 @@ assert.strictEqual(
   "3004a059008297c0",
 );
 
+const framed = new FromPgn().parseFrame(
+  6,
+  60928,
+  44,
+  172,
+  Buffer.from("3004a059008297c0", "hex"),
+);
+assert.deepStrictEqual(framed.fields, pgn.fields);
+
 assert.strictEqual(
   toPgn({ pgn: 127508, Instance: 0, Voltage: 26.27 }).toString("hex"),
   toPgn({ pgn: 127508, fields: { instance: 0, voltage: 26.27 } }).toString(
