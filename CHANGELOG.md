@@ -1,5 +1,18 @@
 # Changelog
 
+## [8.4.0](https://github.com/canboat/canboat-wasm/compare/v8.3.0...v8.4.0) (2026-10-08)
+
+
+### Added
+
+* decode CAN frames passed as header and payload bytes ([27b6bd7](https://github.com/canboat/canboat-wasm/commit/27b6bd7feccc5a0dfb20aa497c8dfd9bb04ce5ba))
+* decode CAN frames passed as header and payload bytes ([cceb108](https://github.com/canboat/canboat-wasm/commit/cceb108cb8e001d9b6e25306d44c430773f29891))
+
+
+### Fixed
+
+* reject decodeFrame header fields that do not fit in a byte ([f5d9c97](https://github.com/canboat/canboat-wasm/commit/f5d9c976372b94a14a193a09ad91f83adb702a20))
+
 ## [8.3.0](https://github.com/canboat/canboat-wasm/compare/v8.2.2...v8.3.0) (2026-09-25)
 
 
