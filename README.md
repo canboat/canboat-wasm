@@ -49,6 +49,11 @@ const json = d.decodeLine(
 );
 // -> '{"seatalkPilotHeading":{...,"description":"Seatalk: Pilot Heading",...}}'
 
+// One CAN frame as a socketcan host reads it: decomposed header plus the
+// payload bytes (at most 8), always through fast-packet / ISO-TP reassembly.
+//                         prio  pgn    src  dst  data
+const fromFrame = d.decodeFrame(7, 65359, 204, 255, payload);
+
 // JSON record (canboatjs or analyzer dialect) -> wire
 const line = encodeToPlain(JSON.stringify(pgnObject), true);
 const bytes = encodeData(JSON.stringify(pgnObject), true); // Uint8Array of the PGN payload
@@ -65,8 +70,9 @@ lines with exactly 8 payload bytes go through fast-packet reassembly.
 import { FromPgn, toPgn, pgnToActisenseSerialFormat } from "@canboat/wasm";
 ```
 
-These cover the surface most consumers use: `FromPgn` (`parseString` plus
-`'pgn'` and `'error'` events, returning canboatjs-shaped objects), `toPgn`
+These cover the surface most consumers use: `FromPgn` (`parseString` and
+`parseFrame` plus `'pgn'` and `'error'` events, returning canboatjs-shaped
+objects), `toPgn`
 (a Buffer of payload bytes), and `pgnToActisenseSerialFormat`.
 
 ## Scope
@@ -74,7 +80,7 @@ These cover the surface most consumers use: `FromPgn` (`parseString` plus
 This package decodes and encodes. It does no I/O, so moving bytes is left to
 whatever you already have: `node:net` for TCP gateways (YDWG, W2K-1, NavLink2,
 IPG100), serialport for NGT-1 and iKonvert, or an `AF_CAN` wrapper for
-socketcan. There is no pure-JS CAN socket, and on hardware CAN buses the native
+socketcan, whose frames go to `decodeFrame` / `parseFrame`. There is no pure-JS CAN socket, and on hardware CAN buses the native
 `canboat interface` still does more for you, including address claiming, the
 NAME responder, and TX chunking.
 
