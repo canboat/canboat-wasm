@@ -28,6 +28,9 @@ pub fn version() -> String {
     canboat::CANBOAT_VERSION.to_string()
 }
 
+/// Payload bytes in one classic CAN frame.
+const CAN_DATA_MAX: usize = 8;
+
 fn database(si: bool, j1939: bool) -> &'static Database {
     let units = if si { Units::Si } else { Units::Metric };
     if j1939 {
@@ -147,6 +150,55 @@ impl Decoder {
             // complete payloads per line.
             _ => true,
         };
+        self.finish(frame, complete)
+    }
+
+    /// Decode one CAN frame given as its header and payload bytes, as a
+    /// socketcan host reads it off the bus. The payload crosses into
+    /// wasm memory as bytes, with no text rendering on either side. A
+    /// frame off the bus is always a wire frame, so it goes through
+    /// fast-packet and ISO-TP reassembly. It carries no timestamp: the
+    /// host stamps the receive time. Returns and throws as
+    /// [`Decoder::decode_line`].
+    #[wasm_bindgen(js_name = decodeFrame)]
+    pub fn decode_frame(
+        &mut self,
+        prio: u32,
+        pgn: u32,
+        src: u32,
+        dst: u32,
+        data: &[u8],
+    ) -> Result<Option<String>, JsError> {
+        if data.len() > CAN_DATA_MAX {
+            return Err(JsError::new(&format!(
+                "frame: {} data bytes, a CAN frame carries at most {CAN_DATA_MAX}",
+                data.len()
+            )));
+        }
+        let frame = Frame::new(
+            None,
+            header_byte("prio", prio)?,
+            pgn,
+            header_byte("src", src)?,
+            header_byte("dst", dst)?,
+            data.iter().copied(),
+        );
+        self.finish(frame, false)
+    }
+}
+
+/// A header field taken as `u32` so an out-of-range number from JS is
+/// rejected, as the line parser rejects it, rather than wrapped into a
+/// byte by the wasm-bindgen conversion.
+fn header_byte(name: &str, value: u32) -> Result<u8, JsError> {
+    u8::try_from(value)
+        .map_err(|_| JsError::new(&format!("frame: {name} {value} does not fit in a byte")))
+}
+
+impl Decoder {
+    /// Reassemble `frame` unless it is already a `complete` record,
+    /// then decode it to the JSON output line.
+    fn finish(&mut self, frame: Frame, complete: bool) -> Result<Option<String>, JsError> {
         let assembled = if complete {
             frame
         } else {
@@ -539,6 +591,60 @@ mod tests {
         let mut d = Decoder::new(true, true, true, false, Some(true));
         let out = d
             .decode_line("  can0  0CF00400   [8]  FF FF FF 8A 03 FF FF FF")
+            .expect("decodes")
+            .expect("complete record");
+        assert!(out.contains("\"ecu1\""), "got: {out}");
+    }
+
+    #[test]
+    fn frame_decodes_like_its_plain_line() {
+        let data = [0x00, 0x10, 0x6e, 0x01, 0x00, 0xff, 0x7f, 0xfd];
+        let from_frame = Decoder::new(true, true, true, false, None)
+            .decode_frame(2, 127250, 204, 255, &data)
+            .expect("decodes")
+            .expect("complete record");
+        let from_line = Decoder::new(true, true, true, false, None)
+            .decode_line(",2,127250,204,255,8,00,10,6e,01,00,ff,7f,fd")
+            .expect("decodes")
+            .expect("complete record");
+        assert_eq!(from_frame, from_line);
+    }
+
+    #[test]
+    fn frames_reassemble_a_fast_packet() {
+        // PGN 127489 Engine Parameters, Dynamic: 26 bytes in four frames.
+        let mut payload = [0xffu8; 26];
+        payload[0] = 0x00;
+        let mut d = Decoder::new(true, true, true, false, None);
+        let mut frames: Vec<Vec<u8>> = vec![[&[0x40, 26][..], &payload[..6]].concat()];
+        for (seq, chunk) in payload[6..].chunks(7).enumerate() {
+            let mut frame = vec![0x41 + seq as u8];
+            frame.extend_from_slice(chunk);
+            frame.resize(8, 0xff);
+            frames.push(frame);
+        }
+        let (last, first) = frames.split_last().expect("four frames");
+        for frame in first {
+            let out = d.decode_frame(2, 127489, 1, 255, frame).expect("decodes");
+            assert!(out.is_none(), "partial packet decoded early: {out:?}");
+        }
+        let out = d
+            .decode_frame(2, 127489, 1, 255, last)
+            .expect("decodes")
+            .expect("complete record");
+        assert!(out.contains("\"pgn\":127489"), "got: {out}");
+    }
+
+    #[test]
+    fn j1939_frame_decodes_eec1() {
+        let out = Decoder::new(true, true, true, false, Some(true))
+            .decode_frame(
+                3,
+                61444,
+                0,
+                255,
+                &[0xff, 0xff, 0xff, 0x8a, 0x03, 0xff, 0xff, 0xff],
+            )
             .expect("decodes")
             .expect("complete record");
         assert!(out.contains("\"ecu1\""), "got: {out}");

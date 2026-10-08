@@ -26,6 +26,12 @@ declare class FromPgn extends EventEmitter {
     readonly options: FromPgnOptions;
     constructor(options?: FromPgnOptions);
     parseString(line: string): PgnObject | undefined;
+    /** Decode one CAN frame given as its header and payload bytes, as a
+     * socketcan host reads it off the bus — no text rendering of the
+     * payload on either side. Frames go through fast-packet / ISO-TP
+     * reassembly, so feed them in bus order. */
+    parseFrame(prio: number, pgn: number, src: number, dst: number, data: Uint8Array): PgnObject | undefined;
+    private emitRecord;
 }
 /** Encode a PGN object and return its payload bytes — the canboatjs
  * `toPgn` contract. */

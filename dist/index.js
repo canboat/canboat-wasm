@@ -96,6 +96,23 @@ var FromPgn = class extends EventEmitter {
       this.emit("error", line, err);
       return void 0;
     }
+    return this.emitRecord(out);
+  }
+  /** Decode one CAN frame given as its header and payload bytes, as a
+   * socketcan host reads it off the bus — no text rendering of the
+   * payload on either side. Frames go through fast-packet / ISO-TP
+   * reassembly, so feed them in bus order. */
+  parseFrame(prio, pgn, src, dst, data) {
+    let out;
+    try {
+      out = this.decoder.decodeFrame(prio, pgn, src, dst, data);
+    } catch (err) {
+      this.emit("error", { prio, pgn, src, dst, data }, err);
+      return void 0;
+    }
+    return this.emitRecord(out);
+  }
+  emitRecord(out) {
     if (out === void 0) {
       return void 0;
     }
