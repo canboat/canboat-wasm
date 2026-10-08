@@ -53,6 +53,15 @@ assert.match(version(), /^\d+\.\d+\.\d+/);
   assert.strictEqual(frame, line);
 }
 
+// decodeFrame rejects what a CAN frame cannot carry instead of
+// truncating the payload or wrapping a header field into a byte.
+{
+  const d = new Decoder(true, true, true, false);
+  assert.throws(() => d.decodeFrame(2, 127250, 204, 255, new Uint8Array(9)));
+  assert.throws(() => d.decodeFrame(2, 127250, 300, 255, new Uint8Array(8)));
+  assert.throws(() => d.decodeFrame(2, 127250, -1, 255, new Uint8Array(8)));
+}
+
 // FromPgn.parseFrame: canboatjs-shaped object from a Buffer payload.
 {
   const pgn = new FromPgn().parseFrame(

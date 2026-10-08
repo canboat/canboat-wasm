@@ -163,10 +163,10 @@ impl Decoder {
     #[wasm_bindgen(js_name = decodeFrame)]
     pub fn decode_frame(
         &mut self,
-        prio: u8,
+        prio: u32,
         pgn: u32,
-        src: u8,
-        dst: u8,
+        src: u32,
+        dst: u32,
         data: &[u8],
     ) -> Result<Option<String>, JsError> {
         if data.len() > CAN_DATA_MAX {
@@ -175,9 +175,24 @@ impl Decoder {
                 data.len()
             )));
         }
-        let frame = Frame::new(None, prio, pgn, src, dst, data.iter().copied());
+        let frame = Frame::new(
+            None,
+            header_byte("prio", prio)?,
+            pgn,
+            header_byte("src", src)?,
+            header_byte("dst", dst)?,
+            data.iter().copied(),
+        );
         self.finish(frame, false)
     }
+}
+
+/// A header field taken as `u32` so an out-of-range number from JS is
+/// rejected, as the line parser rejects it, rather than wrapped into a
+/// byte by the wasm-bindgen conversion.
+fn header_byte(name: &str, value: u32) -> Result<u8, JsError> {
+    u8::try_from(value)
+        .map_err(|_| JsError::new(&format!("frame: {name} {value} does not fit in a byte")))
 }
 
 impl Decoder {
