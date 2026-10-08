@@ -30,7 +30,7 @@
   "repository": "https://github.com/canboat/canboat-wasm",
   "license": "Apache-2.0",
   "dependencies": {
-    "@canboat/ts-pgns": "1.11.x"
+    "@canboat/ts-pgns": "2.0.x"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
