@@ -272,6 +272,19 @@ fn frame_from_json_str(json: &str, si: bool) -> Result<Frame, JsError> {
     }
 }
 
+/// Read one plain-format line — what [`encode_to_plain`] writes, and what
+/// Signal K plugins send on `nmea2000out` — as a complete record whose
+/// payload goes out as given, with no schema involved. Any
+/// length is a whole payload: unlike [`Decoder::decode_line`], an 8-byte
+/// line of a fast PGN is not a wire fragment to reassemble.
+fn frame_from_plain_line(line: &str) -> Result<Frame, JsError> {
+    match line::parse(InputFormat::Plain, line.trim()) {
+        Ok(Some(frame)) => Ok(frame),
+        Ok(None) => Err(JsError::new("parse: not a frame")),
+        Err(e) => Err(JsError::new(&format!("parse: {e}"))),
+    }
+}
+
 /// Encode one analyzer/canboatjs-shaped JSON record to a plain-format
 /// line (the inverse of [`Decoder::decode_line`]). `si` must match the
 /// units the record's values are in.
@@ -318,15 +331,31 @@ impl TxEncoder {
     /// fast-packet payloads per ISO 11783-3.
     pub fn encode(&mut self, json: &str, format_name: &str) -> Result<Vec<String>, JsError> {
         let frame = frame_from_json_str(json, self.si)?;
+        self.write(&frame, format_name)
+    }
+
+    /// Encode one plain-format line (`<timestamp>,<prio>,<pgn>,<src>,<dst>,
+    /// <len>,<hex>…`) for `format`, as [`TxEncoder::encode`] does a JSON
+    /// record. The payload goes out as given, so this sends a frame the
+    /// schema cannot encode, or one a host built byte by byte.
+    #[wasm_bindgen(js_name = encodeLine)]
+    pub fn encode_line(&mut self, line: &str, format_name: &str) -> Result<Vec<String>, JsError> {
+        let frame = frame_from_plain_line(line)?;
+        self.write(&frame, format_name)
+    }
+}
+
+impl TxEncoder {
+    fn write(&mut self, frame: &Frame, format_name: &str) -> Result<Vec<String>, JsError> {
         let mut line = String::with_capacity(64);
         match format_name {
             "plain" => {
-                line::write_plain(&mut line, &frame)
+                line::write_plain(&mut line, frame)
                     .map_err(|e| JsError::new(&format!("format: {e}")))?;
                 Ok(vec![line])
             }
             "n2k-ascii" => {
-                line::write_actisense_ascii(&mut line, &frame)
+                line::write_actisense_ascii(&mut line, frame)
                     .map_err(|e| JsError::new(&format!("format: {e}")))?;
                 Ok(vec![line])
             }
@@ -346,6 +375,15 @@ impl TxEncoder {
                     l
                 };
                 if fastpacket::packet_type(frame.pgn) != FramePacketType::Fast {
+                    // A plain line can carry any length; one wire frame
+                    // cannot.
+                    if frame.data.len() > CAN_DATA_MAX {
+                        return Err(JsError::new(&format!(
+                            "ydwg-raw: {} data bytes for single-frame PGN {}, a CAN frame carries at most {CAN_DATA_MAX}",
+                            frame.data.len(),
+                            frame.pgn
+                        )));
+                    }
                     return Ok(vec![write_one(&frame.data)]);
                 }
                 let seq = {
@@ -541,13 +579,28 @@ impl ByteDecoder {
     #[wasm_bindgen(js_name = encodeFrame)]
     pub fn encode_frame(&mut self, json: &str, si: bool) -> Result<Vec<u8>, JsError> {
         let frame = frame_from_json_str(json, si)?;
-        self.codec
-            .send(&frame)
-            .map_err(|refused| JsError::new(&format!("{}: {refused}", self.kind.name())))
+        self.send(&frame)
+    }
+
+    /// Encode one plain-format line (`<timestamp>,<prio>,<pgn>,<src>,<dst>,
+    /// <len>,<hex>…`) to the device's transmit bytes, as
+    /// [`ByteDecoder::encode_frame`] does a JSON record. The payload goes
+    /// out as given, so this sends a frame the schema cannot encode, or
+    /// one a host built byte by byte.
+    #[wasm_bindgen(js_name = encodeLine)]
+    pub fn encode_line(&mut self, line: &str) -> Result<Vec<u8>, JsError> {
+        let frame = frame_from_plain_line(line)?;
+        self.send(&frame)
     }
 }
 
 impl ByteDecoder {
+    fn send(&mut self, frame: &Frame) -> Result<Vec<u8>, JsError> {
+        self.codec
+            .send(frame)
+            .map_err(|refused| JsError::new(&format!("{}: {refused}", self.kind.name())))
+    }
+
     /// Decode the frames among `events` to JSON; queue the rest.
     fn handle(&mut self, events: Vec<Event>) -> Vec<String> {
         let mut out = Vec::new();
@@ -699,5 +752,55 @@ mod tests {
                 "{json}"
             );
         }
+    }
+
+    #[test]
+    fn plain_line_encodes_like_its_json_record() {
+        let line = encode_to_plain(FLAT_127508, true).expect("plain line");
+        for format in ["plain", "n2k-ascii", "ydwg-raw"] {
+            assert_eq!(
+                TxEncoder::new(true)
+                    .encode_line(&line, format)
+                    .expect("line encodes"),
+                TxEncoder::new(true)
+                    .encode(FLAT_127508, format)
+                    .expect("record encodes"),
+                "{format}"
+            );
+        }
+        for kind in ["ngt1", "ikonvert", "maretron-ipg"] {
+            let decoder = || ByteDecoder::new(kind, true, true, true).expect("known kind");
+            assert_eq!(
+                decoder().encode_line(&line).expect("line encodes"),
+                decoder()
+                    .encode_frame(FLAT_127508, true)
+                    .expect("record encodes"),
+                "{kind}"
+            );
+        }
+    }
+
+    #[test]
+    fn plain_line_payload_goes_out_as_given() {
+        // Airmar's Master Reset, PGN 126720 proprietary ID 1, as an
+        // Airmar sensor's configuration console sends it. A fast PGN, so
+        // even six bytes leave as a fast-packet first frame: sequence 0,
+        // frame 0, length 6.
+        let line = "2026-10-19T00:00:00.000Z,3,126720,0,35,6,87,98,01,ff,ff,ff";
+        assert_eq!(
+            TxEncoder::new(true)
+                .encode_line(line, "ydwg-raw")
+                .expect("line encodes"),
+            ["0DEF2300 00 06 87 98 01 FF FF FF"]
+        );
+        // The Maretron IPG frames the whole payload, which ends its frame.
+        let ipg = ByteDecoder::new("maretron-ipg", true, true, true)
+            .expect("known kind")
+            .encode_line(line)
+            .expect("line encodes");
+        assert!(
+            ipg.ends_with(&[0x87, 0x98, 0x01, 0xff, 0xff, 0xff]),
+            "{ipg:02x?}"
+        );
     }
 }

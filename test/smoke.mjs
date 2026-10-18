@@ -252,6 +252,37 @@ console.log("smoke (esm): all assertions passed");
   );
   assert.throws(() => new ByteDecoder("nope", true, true, true));
 
+  // A plain-format line, as Signal K plugins send it on `nmea2000out`,
+  // goes out like the JSON record it carries; its payload goes out as
+  // given, so a frame the schema cannot encode still reaches the bus.
+  const claimLine = encodeToPlain(claim, true);
+  for (const kind of ["ngt1", "maretron-ipg"]) {
+    assert.deepStrictEqual(
+      new ByteDecoder(kind, true, true, true).encodeLine(claimLine),
+      new ByteDecoder(kind, true, true, true).encodeFrame(claim, true),
+      `${kind} line tx`,
+    );
+  }
+  const { TxEncoder } = await import("../dist/index.js");
+  assert.deepStrictEqual(
+    new TxEncoder(true).encodeLine(
+      "2026-10-19T00:00:00.000Z,3,126720,0,35,6,87,98,01,ff,ff,ff",
+      "ydwg-raw",
+    ),
+    ["0DEF2300 00 06 87 98 01 FF FF FF"],
+  );
+  // One wire frame carries at most 8 bytes, so a longer payload for a
+  // single-frame PGN is refused rather than written as one line.
+  assert.throws(
+    () =>
+      new TxEncoder(true).encodeLine(
+        "2026-10-19T00:00:00.000Z,2,127250,0,255,9,00,10,6e,01,00,ff,7f,fd,ff",
+        "ydwg-raw",
+      ),
+    /a CAN frame carries at most 8/,
+  );
+  assert.throws(() => m.encodeLine("not a frame at all"));
+
   // iKonvert: the init handshake advances on each device answer, frames
   // decode, and closing takes the gateway off the bus.
   const text = (bytes) => Buffer.from(bytes).toString("latin1");
