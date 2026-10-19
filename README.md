@@ -89,6 +89,11 @@ For the byte-stream gateways, `ByteDecoder` (`"ngt1"`, `"ikonvert"`,
 feed it what arrives with `decodeBytes`, write out `initBytes`,
 `takePendingTx` (the next handshake step), `encodeFrame` and `closeBytes`,
 and call `tick` about once a second so its timers advance on a quiet link.
+`encodeFrame` takes a JSON record; `encodeLine` takes a plain-format line
+and sends its payload as given, for a frame built byte by byte, such as
+the lines Signal K plugins send on `nmea2000out`. For the line-based
+gateways, `TxEncoder` takes the same two inputs through `encode` and
+`encodeLine`.
 The protocol code is canboat's own (`canboat::codec`), the same code the
 native `canboat interface` runs.
 
