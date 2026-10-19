@@ -44,6 +44,15 @@ decoding/encoding belongs upstream in canboat (usually in its
   a `Release-As:` footer so release-please releases this package under
   the **same version as the canboat brain it compiles**. Manual pin
   bumps are for emergencies only; say why in the commit message.
+- **A canboat fix can be carried ahead of its release.** Backport it
+  onto the pinned release in a fork and point a `[patch.crates-io]`
+  override at that commit, between the `# BEGIN carried canboat fix` and
+  `# END carried canboat fix` lines in `Cargo.toml`. Carry the fix
+  alone, never canboat's master: master holds unreleased changes this
+  package would then ship under a patch version. Add a smoke vector
+  that fails without the fix. `track-canboat` deletes the block when it
+  moves the pin, and that vector fails the tracking run if the release
+  it moves to does not include the fix yet.
 - **Publishing is release-please + tag-triggered CI, never a laptop.**
   Merging a `track-canboat` PR makes release-please propose
   `chore: release X.Y.Z`; merging that tags `vX.Y.Z`, writes

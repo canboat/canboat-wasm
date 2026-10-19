@@ -167,6 +167,35 @@ assert.match(version(), /^\d+\.\d+\.\d+/);
   );
 }
 
+// A 126208 Request for an Airmar 126720 variant, as an Airmar DST console
+// sends it: its parameters name the variant behind 126720's catch-all, so
+// parameter 4 is Airmar's Proprietary ID, as in the C analyzer
+// (canboat#1074). The payload is byte-identical to canboatjs's.
+{
+  const request = JSON.stringify({
+    pgn: 126208,
+    prio: 3,
+    dst: 35,
+    fields: {
+      functionCode: "Request",
+      pgn: 126720,
+      numberOfParameters: 3,
+      list: [
+        { parameter: 1, value: 135 },
+        { parameter: 3, value: 4 },
+        { parameter: 4, value: 35 },
+      ],
+    },
+  });
+  const line = encodeToPlain(request, true);
+  assert.ok(
+    line.endsWith(",18,00,00,ef,01,ff,ff,ff,ff,ff,ff,03,01,87,00,03,04,04,23"),
+    line,
+  );
+  const decoded = new Decoder(true, true, true, true).decodeLine(line);
+  assert.ok(decoded.includes('"name":"Simulate Mode"'), decoded);
+}
+
 // error path: raw API throws, shim reports via the 'error' event.
 {
   const d = new Decoder(true, true, true, false);

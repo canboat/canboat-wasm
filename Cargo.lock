@@ -55,8 +55,7 @@ checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
 [[package]]
 name = "canboat"
 version = "8.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d134170bbbdf297ee9ae1b02694e3e68648a4bbb75c75ba04d73414d2f86b64"
+source = "git+https://github.com/dirkwa/canboat-fork?rev=e45ed412e2644b877ba6e1b5f07555aa1d1db0e6#e45ed412e2644b877ba6e1b5f07555aa1d1db0e6"
 dependencies = [
  "anyhow",
  "chrono",

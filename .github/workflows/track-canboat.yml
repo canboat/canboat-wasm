@@ -111,6 +111,11 @@ jobs:
           done
           sed -i -E "s%^(canboat *= *\{ *version = \")=?[^\"]+\"%\1=$VERSION\"%" Cargo.toml
           grep -qE "^canboat *= *\{ *version = \"=$VERSION\"" Cargo.toml
+          # A fix carried ahead of a canboat release (Cargo.toml's
+          # "carried canboat fix" block) patches the old pin only. Its
+          # smoke vector fails the test step below if the release this
+          # moves to does not include the fix, so no tracking PR drops it.
+          sed -i '/^# BEGIN carried canboat fix$/,/^# END carried canboat fix$/d' Cargo.toml
           cargo update -p canboat
 
       - name: Install Rust with wasm target
