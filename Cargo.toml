@@ -32,3 +32,15 @@ strip     = true
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
 
+# BEGIN carried canboat fix
+# canboat/canboat#1074, not yet in a canboat release: a 126208
+# parameter list for 126720 is matched against the manufacturer variants
+# behind its catch-all, as the C analyzer does, so an Airmar DST console's
+# requests and commands encode. The revision is that fix alone on top of
+# canboat v8.3.0, the pin above, so nothing else from canboat's master
+# comes with it. track-canboat deletes this block when it moves the pin;
+# the smoke vector for the console's request then fails the tracking run
+# unless the new release includes the fix too.
+[patch.crates-io]
+canboat = { git = "https://github.com/dirkwa/canboat-fork", rev = "e45ed412e2644b877ba6e1b5f07555aa1d1db0e6" }
+# END carried canboat fix
