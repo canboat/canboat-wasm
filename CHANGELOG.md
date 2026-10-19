@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.5.0](https://github.com/canboat/canboat-wasm/compare/v8.4.0...v8.5.0) (2026-10-19)
+
+
+### Added
+
+* encode plain-format lines for transmit ([7da1196](https://github.com/canboat/canboat-wasm/commit/7da1196630667cccc3ad33db8603d381ec9935b7))
+* encode plain-format lines for transmit ([1057a85](https://github.com/canboat/canboat-wasm/commit/1057a850a03c83ef668345d7dea3517574c23a17))
+
 ## [8.4.0](https://github.com/canboat/canboat-wasm/compare/v8.3.0...v8.4.0) (2026-10-08)
 
 
