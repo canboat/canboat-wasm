@@ -1,5 +1,13 @@
 # Changelog
 
+## [8.5.1](https://github.com/canboat/canboat-wasm/compare/v8.5.0...v8.5.1) (2026-10-19)
+
+
+### Fixed
+
+* carry canboat[#1074](https://github.com/canboat/canboat-wasm/issues/1074) until canboat's next release ([397fd46](https://github.com/canboat/canboat-wasm/commit/397fd463659f06bb458974ced7dbe5c9af7920b7))
+* carry canboat[#1074](https://github.com/canboat/canboat-wasm/issues/1074) until canboat's next release ([8097df7](https://github.com/canboat/canboat-wasm/commit/8097df79fd22375ea8cbb52f42ba6ea3dcce0b77))
+
 ## [8.5.0](https://github.com/canboat/canboat-wasm/compare/v8.4.0...v8.5.0) (2026-10-19)
 
 
