@@ -530,7 +530,7 @@ impl ByteDecoder {
     }
 
     /// Periodic keepalive payload, or `undefined` when the device needs
-    /// none. The NGT-1 wants it every 20 s while the link is quiet.
+    /// none.
     #[wasm_bindgen(js_name = keepaliveBytes)]
     pub fn keepalive_bytes(&self) -> Option<Vec<u8>> {
         self.codec.keepalive().map(|(_, bytes)| bytes)
@@ -730,7 +730,7 @@ mod tests {
     #[test]
     fn flat_record_keeps_envelope() {
         let frame = frame_from_json_str(
-            r#"{"pgn":127506,"prio":3,"dst":42,"DC Instance":0,"DC Type":"Battery","Instance":0,"State of Charge":71,"Time Remaining":null,"Ripple Voltage":null}"#,
+            r#"{"pgn":127506,"prio":3,"dst":42,"DC Instance":0,"DC Type":"Battery","Instance":0,"State of Charge":0.71,"Time Remaining":null,"Ripple Voltage":null}"#,
             true,
         )
         .expect("flat encodes");
