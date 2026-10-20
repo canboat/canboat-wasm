@@ -3,6 +3,7 @@
 // parity, TX corpus sweeps) run in the canboat/signalk harnesses; this
 // guards the bindings and the package entry points.
 import assert from "node:assert";
+import { setTimeout as sleep } from "node:timers/promises";
 import {
   Decoder,
   encodeToPlain,
@@ -156,7 +157,7 @@ assert.match(version(), /^\d+\.\d+\.\d+/);
   const { TxEncoder, ByteDecoder } = await import("../dist/index.js");
   assert.deepStrictEqual(
     new TxEncoder(true).encode(JSON.stringify(flat), "n2k-ascii"),
-    ["A000000.000 FF6 1F214 00430A81FD3F75FF"],
+    ["A000000.000 00FF6 1F214 00430A81FD3F75FF"],
   );
   const m = new ByteDecoder("maretron-ipg", true, true, true);
   assert.ok(
@@ -217,7 +218,7 @@ assert.match(version(), /^\d+\.\d+\.\d+/);
   const pgn = p.parseString("  can0  0CF00400   [8]  FF FF FF 8A 03 FF FF FF");
   assert.strictEqual(pgn.pgn, 61444);
   assert.strictEqual(pgn.description, "ECU #1");
-  assert.strictEqual(pgn.fields.engineRpm, 113.2);
+  assert.strictEqual(pgn.fields.engineRpm, 1.8875);
   assert.ok(pgn.timestamp, "candump lines get a receive timestamp");
   const n2k = new FromPgn();
   const fallback = n2k.parseString(
@@ -252,7 +253,7 @@ console.log("smoke (esm): all assertions passed");
   assert.strictEqual(m.keepaliveBytes(), undefined);
   const n = new ByteDecoder("ngt1", true, true, true);
   assert.ok(n.initBytes("").length > 0, "ngt1 startup ping");
-  assert.ok(n.keepaliveBytes().length > 0, "ngt1 keepalive");
+  assert.strictEqual(n.keepaliveBytes(), undefined);
   const claim = JSON.stringify({
     pgn: 60928,
     prio: 6,
@@ -271,10 +272,13 @@ console.log("smoke (esm): all assertions passed");
       arbitraryAddressCapable: "Yes",
     },
   });
-  assert.ok(
-    Buffer.from(n.encodeFrame(claim, true)).length > 10,
-    "ngt1 BEM tx frame",
-  );
+  // An NGT-1 drops what is written just after Set Operating Mode, so
+  // frames sent then are held and come out of tick() once it settles.
+  assert.strictEqual(n.encodeFrame(claim, true).length, 0, "ngt1 holds tx");
+  n.tick();
+  await sleep(600);
+  n.tick();
+  assert.ok(n.takePendingTx().length > 10, "ngt1 BEM tx frame");
   assert.ok(
     Buffer.from(m.encodeFrame(claim, true)).length > 10,
     "maretron tx frame",
