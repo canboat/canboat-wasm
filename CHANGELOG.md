@@ -1,5 +1,13 @@
 # Changelog
 
+## [9.1.0](https://github.com/canboat/canboat-wasm/compare/v9.0.0-beta.1...v9.1.0) (2026-10-28)
+
+
+### Added
+
+* canboat v9.1.0 ([f871e5c](https://github.com/canboat/canboat-wasm/commit/f871e5c257489937153c22f8afc47b7d36117ef2))
+* canboat v9.1.0 ([e02370f](https://github.com/canboat/canboat-wasm/commit/e02370f31c86f5c700be801f9526f273a8f5e1c2))
+
 ## [9.0.0-beta.1](https://github.com/canboat/canboat-wasm/compare/v8.5.1...v9.0.0-beta.1) (2026-10-20)
 
 
