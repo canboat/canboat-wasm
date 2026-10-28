@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 # features. Pinned exactly: the npm version names the canboat release it
 # compiles. Bumping the pin changes the compiled brain; it happens via the
 # track-canboat workflow, which follows canboat releases.
-canboat      = { version = "=9.0.0", default-features = false, features = ["decode", "json-input"] }
+canboat      = { version = "=9.1.0", default-features = false, features = ["decode", "json-input"] }
 # Already in the tree via canboat's json-input; used to fold flat
 # canboatjs records into `fields` before encoding.
 serde_json   = "1"
